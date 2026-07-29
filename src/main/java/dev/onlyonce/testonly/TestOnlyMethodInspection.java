@@ -9,6 +9,8 @@ import com.intellij.codeInspection.InspectionsBundle;
 import com.intellij.codeInspection.LocalQuickFix;
 import com.intellij.codeInspection.ProblemDescriptionsProcessor;
 import com.intellij.codeInspection.ProblemHighlightType;
+import com.intellij.codeInsight.options.JavaClassValidator;
+import com.intellij.codeInspection.options.OptPane;
 import com.intellij.codeInspection.reference.RefElement;
 import com.intellij.codeInspection.reference.RefEntity;
 import com.intellij.codeInspection.reference.RefGraphAnnotator;
@@ -24,6 +26,9 @@ import com.intellij.psi.search.searches.MethodReferencesSearch;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Reports production methods whose every caller lives in a test source root.
  * <p>
@@ -37,6 +42,23 @@ public final class TestOnlyMethodInspection extends GlobalInspectionTool {
     private static final Logger LOG = Logger.getInstance(TestOnlyMethodInspection.class);
 
     static final String SHORT_NAME = "MethodUsedOnlyFromTests";
+
+    /**
+     * Annotations that mark a method as knowingly test-facing. A method carrying one of these has
+     * already been acknowledged by whoever wrote it, so reporting it again is noise — and it would be
+     * loudest on the codebases that are most disciplined about marking such methods.
+     * <p>
+     * Editable in the inspection settings rather than hard-coded: teams have their own conventions,
+     * and the well-known names below are only a starting point. Remove them to report annotated
+     * methods anyway; add your own to have them respected.
+     * <p>
+     * Public and non-final so the inspection profile can serialise it.
+     */
+    public List<String> ignoredAnnotations = new ArrayList<>(List.of(
+            "org.jetbrains.annotations.TestOnly",
+            "org.jetbrains.annotations.VisibleForTesting",
+            "com.google.common.annotations.VisibleForTesting"
+    ));
 
     private volatile CallerOrigins origins = new CallerOrigins();
 
@@ -53,6 +75,15 @@ public final class TestOnlyMethodInspection extends GlobalInspectionTool {
     @Override
     public @NotNull String getShortName() {
         return SHORT_NAME;
+    }
+
+    @Override
+    public @NotNull OptPane getOptionsPane() {
+        return OptPane.pane(
+                OptPane.stringList("ignoredAnnotations",
+                        "Do not report methods annotated with:",
+                        new JavaClassValidator().annotationsOnly().withTitle("Choose annotation"))
+        );
     }
 
     @Override
@@ -115,7 +146,7 @@ public final class TestOnlyMethodInspection extends GlobalInspectionTool {
             return null;
         }
         RefMethod refMethod = (RefMethod) refEntity;
-        if (!TestOnlyMethodDetector.isUsedOnlyFromTests(refMethod, origins)) {
+        if (!TestOnlyMethodDetector.isUsedOnlyFromTests(refMethod, origins, ignoredAnnotations)) {
             return null;
         }
         PsiMethod psiMethod = TestOnlyMethodDetector.asPsiMethod(refMethod);

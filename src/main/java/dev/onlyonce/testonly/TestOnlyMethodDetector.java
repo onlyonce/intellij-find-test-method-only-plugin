@@ -1,11 +1,13 @@
 package dev.onlyonce.testonly;
 
+import com.intellij.codeInsight.AnnotationUtil;
 import com.intellij.codeInspection.deadCode.UnusedDeclarationInspectionBase;
 import com.intellij.codeInspection.ex.EntryPointsManager;
 import com.intellij.codeInspection.reference.RefMethod;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.TestSourcesFilter;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.PsiClass;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiMethod;
 import com.intellij.psi.util.PsiUtilCore;
@@ -13,6 +15,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayDeque;
+import java.util.Collection;
 import java.util.Deque;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -28,7 +31,9 @@ final class TestOnlyMethodDetector {
     private TestOnlyMethodDetector() {
     }
 
-    static boolean isUsedOnlyFromTests(@NotNull RefMethod refMethod, @NotNull CallerOrigins origins) {
+    static boolean isUsedOnlyFromTests(@NotNull RefMethod refMethod,
+                                       @NotNull CallerOrigins origins,
+                                       @NotNull Collection<String> ignoredAnnotations) {
         PsiMethod psiMethod = asPsiMethod(refMethod);
         if (psiMethod == null) {
             return false;
@@ -41,6 +46,9 @@ final class TestOnlyMethodDetector {
             return false;
         }
         if (isInTestSources(psiMethod)) {
+            return false;
+        }
+        if (isAcknowledgedAsTestFacing(psiMethod, ignoredAnnotations)) {
             return false;
         }
 
@@ -63,6 +71,27 @@ final class TestOnlyMethodDetector {
 
         // No callers at all is plain dead code — that belongs to the Unused declaration inspection.
         return anyTestCaller && !anyProductionCaller;
+    }
+
+    /**
+     * Whether the author has already declared this method test-facing, using one of the annotations
+     * configured in the inspection settings.
+     * <p>
+     * The containing class is checked too, because {@code @TestOnly} and friends target types as well
+     * as methods — a method inside a class marked test-only is covered by that declaration.
+     * {@code CHECK_HIERARCHY} means an annotation on an overridden declaration counts, so marking an
+     * interface method once is enough.
+     */
+    private static boolean isAcknowledgedAsTestFacing(@NotNull PsiMethod psiMethod,
+                                                      @NotNull Collection<String> ignoredAnnotations) {
+        if (ignoredAnnotations.isEmpty()) {
+            return false;
+        }
+        if (AnnotationUtil.isAnnotated(psiMethod, ignoredAnnotations, AnnotationUtil.CHECK_HIERARCHY)) {
+            return true;
+        }
+        PsiClass owner = psiMethod.getContainingClass();
+        return owner != null && AnnotationUtil.isAnnotated(owner, ignoredAnnotations, 0);
     }
 
     @Nullable

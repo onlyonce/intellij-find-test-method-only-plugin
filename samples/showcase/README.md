@@ -39,10 +39,22 @@ Methods annotated [`@ExpectedFinding`](src/main/java/showcase/ExpectedFinding.ja
 | `Money.cents()` | record accessor — generated from the component list, so "delete it" is not an available fix |
 | `LoudGreeter.greet()` | production calls it through the `Greeter` interface. Without taking the verdict across the override family, every `@Override` in a codebase would be reported |
 
-Framework entry points — Spring `@Bean`, `@KafkaListener`, `@Scheduled`, JPA, Jackson — are excluded
-too, but cannot be demonstrated here without putting those frameworks on the sample classpath. They
-are handled by delegating to the platform's registered entry points rather than by a hand-rolled
-annotation list, so they follow whatever the host IDE knows about.
+## Two exclusions this showcase deliberately does not demonstrate
+
+**Framework entry points** — Spring `@Bean`, `@KafkaListener`, `@Scheduled`, JPA, Jackson. Showing
+them would mean putting those frameworks on the sample classpath. They are handled by delegating to
+the platform's registered entry points rather than a hand-rolled list, so they follow whatever the
+host IDE knows about.
+
+**Annotated methods** — a method marked with anything in the inspection's *Do not report methods
+annotated with* list is skipped. Demonstrating it with the real `@TestOnly` would require
+`org.jetbrains:annotations` here, and the test fixture resolves that annotation through
+`MavenDependencyUtil.addFromMaven(...)` — a network dependency at test time. A flaky offline build is
+not worth a demo case.
+
+Both are covered instead by `TestOnlyMethodInspectionTest`, which asserts the annotation setting in
+both directions using a project-local annotation — proving the behaviour is driven by the setting
+rather than by any hard-coded name.
 
 ## The overload case earned its place
 

@@ -43,6 +43,26 @@ test sources, and anything the platform considers an entry point. Entry points a
 honoured — Spring `@Bean` / `@KafkaListener` / `@Scheduled` / `@EventListener`, JPA no-arg
 constructors and Jackson accessors are left alone.
 
+### Annotated methods — a configurable list
+
+A method you have already marked as test-facing is not reported. Which annotations count is an
+editable list in the inspection settings, seeded with:
+
+- `org.jetbrains.annotations.TestOnly`
+- `org.jetbrains.annotations.VisibleForTesting`
+- `com.google.common.annotations.VisibleForTesting`
+
+Remove them to report annotated methods anyway, or add your own conventions — the field offers
+annotation-name completion. An annotation on the containing class covers every method in it, and one
+on an overridden declaration covers its overrides.
+
+This is deliberately not hard-coded. Teams have their own markers, and an inspection that ignores
+that would be noisiest on exactly the codebases most disciplined about acknowledging test-facing API.
+
+It also pairs with the built-in **Test-only usage in production code** inspection, which runs the
+other way round: ours finds the candidates, you annotate the ones worth keeping, and the built-in
+then stops production code from calling them.
+
 ## Usage
 
 1. `Settings → Plugins → ⚙ → Install Plugin from Disk…` → the built zip → restart

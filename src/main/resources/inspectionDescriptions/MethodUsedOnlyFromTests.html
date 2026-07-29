@@ -27,6 +27,16 @@ void testLegacyVat() {
     accessors and methods overriding library declarations are also skipped.
 </p>
 <p>
+    <b>Do not report methods annotated with</b> is an editable list of annotations that mark a method
+    as knowingly test-facing. A method carrying one of them has already been acknowledged, so
+    reporting it again is noise — and it would be loudest on the codebases most disciplined about
+    marking such methods. The list starts with <code>org.jetbrains.annotations.TestOnly</code>,
+    <code>org.jetbrains.annotations.VisibleForTesting</code> and Guava's
+    <code>com.google.common.annotations.VisibleForTesting</code>; remove them to report annotated
+    methods anyway, or add your own team's conventions. An annotation on the containing class counts
+    for every method in it, and an annotation on an overridden declaration counts for its overrides.
+</p>
+<p>
     This is a global inspection: run it via <i>Analyze | Inspect Code</i> with an analysis scope that
     <b>includes test sources</b>. With test sources excluded the inspection cannot tell a test-only
     method from a fully unused one, so it reports nothing.
