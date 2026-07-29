@@ -73,20 +73,30 @@ affordable on a large codebase.
 
 ## Building
 
-Requires JDK 21 (the toolchain target for IntelliJ branch 261) — the Gradle wrapper handles the rest.
+Built against the 2023.3 SDK with a Java 17 toolchain — the lowest supported target, so a newer API
+cannot slip in unnoticed. The Gradle wrapper provisions the JDK itself via the foojay resolver, so
+nothing needs to be installed beyond a JVM to run Gradle.
 
 ```bash
 ./gradlew build          # compile + test
-./gradlew verifyPlugin   # binary compatibility check
+./gradlew verifyPlugin   # binary compatibility across the whole supported range
 ./gradlew runIde         # sandbox IDE with the plugin loaded
+```
+
+`verifyPlugin` checks every IntelliJ IDEA release from 2023.3 onward. Since `since-build` is
+open-ended and the release selector lags the newest builds, you can add a locally installed IDE:
+
+```bash
+./gradlew verifyPlugin -PlocalIdePath=/path/to/your/IDE
 ```
 
 The distributable lands in `build/distributions/`.
 
 ## Status
 
-Built and tested against IntelliJ IDEA 2026.1.4 (IU-261.26222.65); the plugin verifier reports
-compatible with 2026.1 and the 2026.2 EAP. Ten fixture tests cover the reporting and exclusion rules.
+**Requires IntelliJ IDEA 2023.3 or newer** (any edition — the inspection only needs the bundled Java
+plugin). The plugin verifier reports *Compatible* against IC-233, IC-241, IC-242, IC-243, IC-251,
+IC-252 and IU-261. Ten fixture tests cover the reporting and exclusion rules.
 
 Confirmed working on a real-world Spring project — the case the fixture tests cannot cover, since
 framework entry points depend on plugins that are not on the test classpath.

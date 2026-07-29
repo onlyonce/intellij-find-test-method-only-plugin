@@ -1,4 +1,6 @@
+import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
+import org.jetbrains.intellij.platform.gradle.models.ProductRelease
 
 plugins {
     id("java")
@@ -17,7 +19,7 @@ repositories {
 
 dependencies {
     intellijPlatform {
-        intellijIdea("2026.1.4")
+        intellijIdeaCommunity("2023.3.8")
         bundledPlugin("com.intellij.java")
         testFramework(TestFrameworkType.Platform)
         // DefaultLightProjectDescriptor / LightJavaCodeInsightFixtureTestCase live in the Java
@@ -32,20 +34,30 @@ dependencies {
 java {
     toolchain {
         // Branch 261 (2026.1) targets Java 21 — not the local JDK 25.
-        languageVersion = JavaLanguageVersion.of(21)
+        languageVersion = JavaLanguageVersion.of(17)
     }
 }
 
 intellijPlatform {
     pluginConfiguration {
         ideaVersion {
-            sinceBuild = "261"
+            sinceBuild = "233"
             untilBuild = provider { null }
         }
     }
     pluginVerification {
         ides {
-            recommended()
+            // Verify every release in the declared compatibility range, not just the latest —
+            // since-build is a promise and this is the only thing that checks it.
+            select {
+                types = listOf(IntelliJPlatformType.IntellijIdeaCommunity)
+                channels = listOf(ProductRelease.Channel.RELEASE)
+                sinceBuild = "233"
+                // No untilBuild: since-build is open-ended, so verify every release up to the newest.
+            }
+            // The release selector currently tops out at 2025.2. Point this at a locally installed
+            // newer IDE to also prove the upper end of the open-ended range.
+            providers.gradleProperty("localIdePath").orNull?.let { local(it) }
         }
     }
 }

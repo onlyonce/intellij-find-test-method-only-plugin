@@ -28,10 +28,13 @@ public final class TwoRootProjectDescriptor extends DefaultLightProjectDescripto
     /** Directory name of the test source root, a sibling of {@code /src} under {@code temp:///}. */
     static final String TEST_ROOT = "testSrc";
 
-    private static final LanguageLevel LANGUAGE_LEVEL = LanguageLevel.JDK_21;
+    // JDK 17 rather than 21: records (the only modern construct the fixtures need) are final since
+    // Java 16, and getMockJdk17() has a stable signature across the whole supported IDE range —
+    // getMockJdk(LanguageLevel) does not exist before 2024.x.
+    private static final LanguageLevel LANGUAGE_LEVEL = LanguageLevel.JDK_17;
 
     public TwoRootProjectDescriptor() {
-        super(() -> IdeaTestUtil.getMockJdk(LANGUAGE_LEVEL));
+        super(IdeaTestUtil::getMockJdk17);
     }
 
     @Override

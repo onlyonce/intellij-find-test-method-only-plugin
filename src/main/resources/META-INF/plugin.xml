@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>dev.onlyonce.testonlymethods</id>
     <name>Test-Only Method Detector</name>
-    <vendor>onlyonce</vendor>
+    <vendor url="https://github.com/onlyonce/intellij-find-test-method-only-plugin">onlyonce</vendor>
 
     <description><![CDATA[
         Reports production Java methods whose only remaining callers live in test source roots.
@@ -17,6 +17,18 @@
         codebases.
         </p>
     ]]></description>
+
+    <change-notes><![CDATA[
+        <b>0.1.0</b>
+        <ul>
+            <li>Initial release.</li>
+            <li>Reports production Java methods whose every caller lives in a test source root.</li>
+            <li>Excludes framework entry points, constructors, <code>main</code>, record accessors and
+                methods overriding library declarations.</li>
+            <li>Confirms each finding against the index, so references from Spring XML, SpEL,
+                properties files and javadoc suppress the report.</li>
+        </ul>
+    ]]></change-notes>
 
     <depends>com.intellij.modules.java</depends>
 
