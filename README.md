@@ -119,4 +119,4 @@ Known gaps are recorded honestly in [Status](#status) rather than glossed over.
 
 ## Licence
 
-Not yet chosen.
+[MIT](LICENSE) — © 2026 onlyonce. Use it, fork it, ship it; just keep the copyright notice.
