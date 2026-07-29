@@ -341,7 +341,7 @@ public class TestOnlyMethodInspectionTest extends LightJavaCodeInsightFixtureTes
      * with it the source-root cleanup — runs only once. Files left in the test root would leak into
      * the next test.
      */
-    private static void cleanTestSourceRoot() throws IOException {
+    static void cleanTestSourceRoot() throws IOException {
         VirtualFile root = VirtualFileManager.getInstance()
                 .refreshAndFindFileByUrl("temp:///" + TwoRootProjectDescriptor.TEST_ROOT);
         if (root == null) {

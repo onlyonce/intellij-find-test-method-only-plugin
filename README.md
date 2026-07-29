@@ -71,6 +71,18 @@ Two stages, because the cheap one is imprecise and the precise one is expensive.
 Because stage two runs over a shortlist rather than every method, the per-method index search stays
 affordable on a large codebase.
 
+## What it catches, by example
+
+[`samples/showcase`](samples/showcase) is a small project with a real production and test source
+root, holding one deliberately-unused method per case the inspection handles — and one per exclusion.
+
+It is not a demo folder. `ShowcaseInspectionTest` loads those same files and asserts the findings are
+exactly the methods annotated `@ExpectedFinding`, so the examples cannot drift away from the
+behaviour they describe. Its [README](samples/showcase/README.md) tabulates every case.
+
+It earned its keep immediately: the first run exposed a real defect — an unused overload was being
+masked by a production call to its sibling. See the showcase README for the details.
+
 ## Building
 
 Built against the 2023.3 SDK with a Java 17 toolchain — the lowest supported target, so a newer API

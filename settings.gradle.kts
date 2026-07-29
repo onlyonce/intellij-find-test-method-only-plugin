@@ -5,3 +5,6 @@ plugins {
 }
 
 rootProject.name = "find-test-only-methods"
+
+// Sample input for the inspection: compiled so it stays valid Java, never packaged into the plugin.
+include("samples:showcase")

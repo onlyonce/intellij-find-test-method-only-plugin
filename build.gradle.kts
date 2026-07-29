@@ -33,7 +33,8 @@ dependencies {
 
 java {
     toolchain {
-        // Branch 261 (2026.1) targets Java 21 — not the local JDK 25.
+        // Branch 233 (2023.3), the lowest supported target, runs on Java 17. Building against the
+        // floor rather than the newest SDK is what stops a newer API slipping in unnoticed.
         languageVersion = JavaLanguageVersion.of(17)
     }
 }
@@ -68,4 +69,7 @@ tasks.withType<JavaCompile>().configureEach {
 
 tasks.test {
     useJUnit()
+    // ShowcaseInspectionTest loads the sample sources from disk rather than embedding copies, so the
+    // showcase, the documentation and the assertions cannot drift apart.
+    systemProperty("showcase.dir", layout.projectDirectory.dir("samples/showcase").asFile.absolutePath)
 }

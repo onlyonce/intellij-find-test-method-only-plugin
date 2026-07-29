@@ -151,9 +151,15 @@ public final class TestOnlyMethodInspection extends GlobalInspectionTool {
     private static boolean hasProductionReference(@NotNull PsiMethod psiMethod) {
         GlobalSearchScope productionScope =
                 GlobalSearchScopesCore.projectProductionScope(psiMethod.getProject());
-        // strictSignatureSearch = false also matches references made through overridden or
-        // overriding declarations — again the conservative direction.
-        return MethodReferencesSearch.search(psiMethod, productionScope, false).findFirst() != null;
+        // strictSignatureSearch = true: match only references that resolve to *this* method.
+        //
+        // The looser setting is tempting as "conservative", but it suppresses overloads — a
+        // production call to discount(long) hides an unused discount(long, int), and the finding is
+        // silently lost. It is not needed for correctness either: references arriving through a
+        // super or overriding declaration are already accounted for in stage one, which takes the
+        // verdict across the whole override family. Stage two only has to catch references the
+        // reference graph never saw, and those resolve to the exact method.
+        return MethodReferencesSearch.search(psiMethod, productionScope, true).findFirst() != null;
     }
 
     @Override
