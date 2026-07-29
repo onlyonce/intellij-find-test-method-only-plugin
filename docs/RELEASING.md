@@ -12,8 +12,9 @@ So the first upload is done by hand; every later one is `./gradlew publishPlugin
 4. Fill in the form:
    - **Licence** — MIT. Open-source licences are declared by linking the source repository.
    - **Tags** — `Inspection`, `Code tools`, `Java` are the relevant ones.
-   - **Hidden** — tick this to keep the listing unlisted while still installable by URL. Worth doing for
-     a first release; untick once you are happy with it.
+   - **Hidden** — keeps the listing out of search while still installable by direct URL. Before ticking
+     it, check whether it also defers the approval review; if it does, you would be waiting on a review
+     that has not started.
 5. Wait for review. Marketplace does a manual approval pass on first submissions.
 
 Two values are fixed permanently by that first upload:
@@ -39,6 +40,10 @@ Marketplace rejects an upload whose version already exists, so `version` in
 
 A version with a pre-release suffix (`0.2.0-beta.1`) is published to a `beta` channel automatically — see
 the `channels` computation in the build script — so it cannot reach users on the stable channel.
+
+A custom channel is not merely "hidden from stable users": it is invisible to *everyone* until they add
+the custom repository URL in *Settings | Plugins | ⚙ | Manage Plugin Repositories*. Use it for a version
+you want a named group to test, not as a soft launch.
 
 ## Signing — optional
 

@@ -5,14 +5,14 @@
 
     <description><![CDATA[
         <p>
-        Reports <b>production Java methods whose every caller lives in a test source root</b> &mdash;
+        Reports <b>production Java methods whose every caller lives in a test source root</b> —
         production API kept alive only by the tests that assert on it. Such a method inflates the
         public surface, blocks refactoring, and still counts as covered in coverage reports.
         </p>
 
         <p><b>Why not just use <em>Unused declaration</em>?</b></p>
         <p>
-        IntelliJ can already compute this, via <em>Unused declaration &rarr; Entry points &rarr; "When
+        IntelliJ can already compute this, via <em>Unused declaration → Entry points → "When
         entry points are in test sources, mark callees as: unused"</em>. But that option works by
         stripping entry-point status from everything in a test source root, so your <code>@Test</code>
         methods are reported as unused too, with the identical "never used" message. The distinction is
@@ -26,10 +26,10 @@
 
         <p><b>What is excluded</b></p>
         <ul>
-            <li>Methods with no callers at all &mdash; that is plain dead code, and
+            <li>Methods with no callers at all — that is plain dead code, and
                 <em>Unused declaration</em>'s job.</li>
             <li>Framework entry points, resolved through the platform's own registered entry points and
-                your <em>Settings | Editor | Inspections | Entry points</em> configuration &mdash; so
+                your <em>Settings | Editor | Inspections | Entry points</em> configuration — so
                 Spring <code>@Bean</code>, <code>@KafkaListener</code>, <code>@Scheduled</code> and
                 <code>@EventListener</code> methods, JPA no-arg constructors and Jackson accessors are
                 left alone.</li>
@@ -49,7 +49,7 @@
         <p><b>How to run it</b></p>
         <ul>
             <li>Enable <b>Method used only from test code</b> in
-                <em>Settings | Editor | Inspections</em> &mdash; it is <b>off by default</b>.</li>
+                <em>Settings | Editor | Inspections</em> — it is <b>off by default</b>.</li>
             <li>Run <em>Analyze | Inspect Code</em> with <b>test sources included</b> in the scope.
                 Without them, a test-only method is indistinguishable from a fully dead one, and the
                 inspection refuses to guess.</li>
