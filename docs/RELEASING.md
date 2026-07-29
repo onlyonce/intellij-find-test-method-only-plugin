@@ -28,6 +28,33 @@ The display name *can* be changed later, and was: `Test-Only Method Detector` be
 `Test-Only Declaration Detector` in 0.3.2, once the inspection reported fields and classes as well as
 methods. The change takes effect on the next upload — there is no separate rename step.
 
+## Checking what is actually live
+
+`publishPlugin` succeeding means **uploaded**, not **visible**. Approval is a separate, per-plugin
+gate, and until it clears the listing is absent from search and from the plugin-manager feed — so
+"I cannot find it in the Marketplace" is the expected state, not evidence the upload failed. New
+versions uploaded while a plugin is still unapproved simply queue behind it.
+
+Public endpoints show nothing for an unapproved plugin. The authoritative check needs the token:
+
+```bash
+set -a; . ./.env; set +a
+curl -s -H "Authorization: Bearer $PUBLISH_TOKEN" \
+  "https://plugins.jetbrains.com/api/plugins?xmlId=dev.onlyonce.testonlymethods&family=intellij"
+curl -s -H "Authorization: Bearer $PUBLISH_TOKEN" \
+  "https://plugins.jetbrains.com/api/plugins/33223/updates"
+```
+
+`33223` is this plugin's numeric id. The fields that answer the question:
+
+| Field | Meaning |
+|---|---|
+| `approve` | the plugin has cleared review. `false` ⇒ nothing is publicly visible, whatever is uploaded |
+| `hasUnapprovedUpdate` | a version is uploaded and waiting |
+| `isHidden` | vendor chose to keep it out of search — distinct from unapproved |
+| `isBlocked` | rejected. Different problem, and not what "not approved yet" looks like |
+| per-update `listed` | that specific version is downloadable |
+
 ## Later releases — one command
 
 ```bash
