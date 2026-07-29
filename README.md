@@ -88,8 +88,11 @@ The distributable lands in `build/distributions/`.
 Built and tested against IntelliJ IDEA 2026.1.4 (IU-261.26222.65); the plugin verifier reports
 compatible with 2026.1 and the 2026.2 EAP. Ten fixture tests cover the reporting and exclusion rules.
 
-Not yet exercised: a headless `inspect.sh` / Qodana run, and a large real-world Spring codebase — both
-entry-point coverage at scale and runtime are unmeasured there.
+Confirmed working on a real-world Spring project — the case the fixture tests cannot cover, since
+framework entry points depend on plugins that are not on the test classpath.
+
+Still unverified: a headless `inspect.sh` / Qodana run. The CI path has never been executed end to
+end, so treat the batch/CI usage as untested.
 
 ## Provenance
 
