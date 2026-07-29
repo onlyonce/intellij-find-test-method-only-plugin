@@ -144,8 +144,9 @@ The distributable lands in `build/distributions/`.
 plugin). The plugin verifier reports *Compatible* against IC-233, IC-241, IC-242, IC-243, IC-251,
 IC-252 and IU-261. Ten fixture tests cover the reporting and exclusion rules.
 
-Confirmed working on a real-world Spring project — the case the fixture tests cannot cover, since
-framework entry points depend on plugins that are not on the test classpath.
+Confirmed working on a real-world Spring project, including the exclusions the fixture tests cannot
+reach: framework entry points, which depend on plugins absent from the test classpath, and generated
+Avro sources suppressed through the annotation list.
 
 Still unverified: a headless `inspect.sh` / Qodana run. The CI path has never been executed end to
 end, so treat the batch/CI usage as untested.
