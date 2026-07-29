@@ -1,0 +1,35 @@
+<html>
+<body>
+Reports methods declared in production source roots whose every caller lives in a test source root.
+<p>
+    Such a method is production API kept alive only by the tests that assert on it. It inflates the
+    public surface, blocks refactoring, and still counts as covered in coverage reports.
+</p>
+<p><b>Example:</b></p>
+<pre><code>
+// src/main/java — reported
+int calculateVatForLegacyRate(int net) { ... }   // only OrderServiceTest calls this
+
+// src/test/java
+void testLegacyVat() {
+    assertEquals(119, service.calculateVatForLegacyRate(100));
+}
+</code></pre>
+<p>
+    A method with no callers at all is <i>not</i> reported here — that is plain dead code and belongs to
+    the <i>Unused declaration</i> inspection.
+</p>
+<p>
+    Framework entry points are excluded through the platform's registered entry points and the
+    <i>Settings | Editor | Inspections | Entry points</i> configuration, so Spring <code>@Bean</code>,
+    <code>@KafkaListener</code>, <code>@Scheduled</code> and <code>@EventListener</code> methods, JPA
+    no-arg constructors and Jackson accessors are left alone. Constructors, <code>main</code>, record
+    accessors and methods overriding library declarations are also skipped.
+</p>
+<p>
+    This is a global inspection: run it via <i>Analyze | Inspect Code</i> with an analysis scope that
+    <b>includes test sources</b>. With test sources excluded the inspection cannot tell a test-only
+    method from a fully unused one, so it reports nothing.
+</p>
+</body>
+</html>

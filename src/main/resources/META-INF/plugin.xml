@@ -1,0 +1,35 @@
+<idea-plugin>
+    <id>dev.onlyonce.testonlymethods</id>
+    <name>Test-Only Method Detector</name>
+    <vendor>onlyonce</vendor>
+
+    <description><![CDATA[
+        Reports production Java methods whose only remaining callers live in test source roots.
+        <p>
+        Unlike the built-in <em>Unused declaration</em> inspection with
+        <em>"reachable from tests" = unused</em>, this reports test-only-used methods as their own
+        category: test methods themselves are never flagged, and the global entry-point behaviour of
+        <em>Unused declaration</em> is left untouched.
+        </p>
+        <p>
+        Framework entry points (Spring, JPA, Jackson, scheduled and listener methods) are excluded via
+        the platform's own registered entry points, so the results are usable on real Spring Boot
+        codebases.
+        </p>
+    ]]></description>
+
+    <depends>com.intellij.modules.java</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <globalInspection
+                language="JAVA"
+                shortName="MethodUsedOnlyFromTests"
+                displayName="Method used only from test code"
+                groupPath="Java"
+                bundle="messages.InspectionsBundle"
+                groupKey="group.names.declaration.redundancy"
+                enabledByDefault="false"
+                level="WARNING"
+                implementationClass="dev.onlyonce.testonly.TestOnlyMethodInspection"/>
+    </extensions>
+</idea-plugin>
