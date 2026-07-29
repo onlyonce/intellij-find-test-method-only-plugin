@@ -145,6 +145,13 @@ public class ShowcaseInspectionTest extends LightJavaCodeInsightFixtureTestCase 
 
     // --------------------------------------------------------------- harness
 
+    /**
+     * {@code getPresentation} is inherited from {@code GlobalInspectionContextImpl}, which is
+     * {@code @ApiStatus.Internal}. Deliberate, and load-bearing here: the sanctioned alternative
+     * diffs against a static expected-XML file, which cannot express "equals whatever is annotated
+     * {@code @ExpectedFinding}" — and that dynamic expectation is the whole point of this test.
+     */
+    @SuppressWarnings("UnstableApiUsage")
     private Set<String> runInspection() {
         GlobalInspectionToolWrapper wrapper = new GlobalInspectionToolWrapper(new TestOnlyMethodInspection());
         AnalysisScope scope = new AnalysisScope(getProject());

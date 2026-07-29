@@ -248,7 +248,13 @@ public class TestOnlyMethodInspectionTest extends LightJavaCodeInsightFixtureTes
      * <p>
      * Self-validating: the first assertion proves the method really is a candidate, so the second
      * cannot pass for the wrong reason.
+     * <p>
+     * {@code ADDITIONAL_ANNOTATIONS} is flagged as scheduled for removal because its declared type,
+     * {@code JDOMExternalizableStringList}, is. It is used anyway because it is the only mutable
+     * path: {@code getCustomAdditionalAnnotations()} returns {@code List.copyOf(...)}, and the other
+     * accessors are read-only too. Test-only.
      */
+    @SuppressWarnings("UnstableApiUsage") // ADDITIONAL_ANNOTATIONS: see the note below
     public void testEntryPointAnnotationSuppressesReport() {
         production("Wired.java", """
                 public @interface Wired { }
@@ -296,6 +302,14 @@ public class TestOnlyMethodInspectionTest extends LightJavaCodeInsightFixtureTes
 
     // ---------------------------------------------------------------- harness
 
+    /**
+     * {@code getPresentation} is inherited from {@code GlobalInspectionContextImpl}, which is
+     * {@code @ApiStatus.Internal}. Deliberate: the sanctioned alternative,
+     * {@code InspectionTestUtil.compareToolResults}, diffs against a static expected-XML file, and
+     * these assertions are expressed as sets in code. Test-only, so a future platform change breaks
+     * this build rather than anyone's IDE.
+     */
+    @SuppressWarnings("UnstableApiUsage")
     private Set<String> runInspection(boolean includeTestSource) {
         GlobalInspectionToolWrapper wrapper = new GlobalInspectionToolWrapper(new TestOnlyMethodInspection());
         AnalysisScope scope = new AnalysisScope(getProject());
