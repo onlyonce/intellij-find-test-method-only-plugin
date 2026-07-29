@@ -138,6 +138,9 @@ open-ended and the release selector lags the newest builds, you can add a locall
 
 The distributable lands in `build/distributions/`.
 
+Publishing to JetBrains Marketplace is documented in [docs/RELEASING.md](docs/RELEASING.md) — the first
+upload is manual, later ones are `./gradlew publishPlugin`.
+
 ## Status
 
 **Requires IntelliJ IDEA 2023.3 or newer** (any edition — the inspection only needs the bundled Java

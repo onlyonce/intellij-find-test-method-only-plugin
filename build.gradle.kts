@@ -46,6 +46,29 @@ intellijPlatform {
             untilBuild = provider { null }
         }
     }
+    // Signing is optional: an unsigned plugin installs fine, the IDE just shows a warning dialog.
+    // Both blocks read from the environment, so nothing secret ever lands in this file. The platform
+    // plugin would pick these env vars up on its own — they are spelled out because an env var read by
+    // a default is invisible to whoever next has to release this.
+    //
+    //   PRIVATE_KEY / PRIVATE_KEY_PASSWORD  openssl-generated key, see docs/RELEASING.md
+    //   CERTIFICATE_CHAIN                   the matching self-signed certificate
+    //   PUBLISH_TOKEN                       Marketplace permanent token
+    //
+    // publishPlugin only works for the *second* and later versions. Marketplace has no API to create a
+    // plugin entry, so the first upload is manual — see docs/RELEASING.md.
+    signing {
+        privateKey = providers.environmentVariable("PRIVATE_KEY")
+        password = providers.environmentVariable("PRIVATE_KEY_PASSWORD")
+        certificateChain = providers.environmentVariable("CERTIFICATE_CHAIN")
+    }
+    publishing {
+        token = providers.environmentVariable("PUBLISH_TOKEN")
+        // A version carrying a pre-release suffix goes to a separate channel, so a "0.2.0-beta.1" can
+        // never reach users who only subscribe to stable.
+        channels = listOf(version.toString().substringAfter('-', "").substringBefore('.')
+                .ifEmpty { "default" })
+    }
     pluginVerification {
         ides {
             // Verify every release in the declared compatibility range, not just the latest —
