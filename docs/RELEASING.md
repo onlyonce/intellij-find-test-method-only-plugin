@@ -24,7 +24,9 @@ Two values are fixed permanently by that first upload:
 | **Plugin ID** | `dev.onlyonce.testonlymethods` — cannot be changed afterwards, ever |
 | **Vendor** | changing it later means contacting marketplace@jetbrains.com |
 
-The display name (`Test-Only Method Detector`) *can* be changed later.
+The display name *can* be changed later, and was: `Test-Only Method Detector` became
+`Test-Only Declaration Detector` in 0.3.2, once the inspection reported fields and classes as well as
+methods. The change takes effect on the next upload — there is no separate rename step.
 
 ## Later releases — one command
 

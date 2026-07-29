@@ -1,4 +1,4 @@
-# Test-Only Method Detector
+# Test-Only Declaration Detector
 
 > 🤖 **100% vibecoded with Claude Opus 5.** Every line here — Java, Gradle, tests, this README — was
 > written by the model. See [Provenance](#provenance).

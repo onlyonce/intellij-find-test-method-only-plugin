@@ -1,6 +1,6 @@
 <idea-plugin>
     <id>dev.onlyonce.testonlymethods</id>
-    <name>Test-Only Method Detector</name>
+    <name>Test-Only Declaration Detector</name>
     <vendor url="https://github.com/onlyonce/intellij-find-test-method-only-plugin">onlyonce</vendor>
 
     <description><![CDATA[
@@ -86,6 +86,12 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <b>0.3.2</b>
+        <ul>
+            <li>Renamed the plugin to <b>Test-Only Declaration Detector</b>, since it no longer reports
+                only methods. The plugin id is unchanged, so this arrives as an ordinary update.</li>
+        </ul>
+
         <b>0.3.1</b>
         <ul>
             <li>Reports <b>fields</b> and <b>whole classes</b> used only from test code, not just
