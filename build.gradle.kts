@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "dev.onlyonce"
-version = "0.1.0"
+version = "0.3.1"
 
 repositories {
     mavenCentral()
@@ -95,4 +95,11 @@ tasks.test {
     // ShowcaseInspectionTest loads the sample sources from disk rather than embedding copies, so the
     // showcase, the documentation and the assertions cannot drift apart.
     systemProperty("showcase.dir", layout.projectDirectory.dir("samples/showcase").asFile.absolutePath)
+    // ...which makes those sources a test input Gradle cannot see, because it tracks the value of the
+    // system property and not what the directory contains. Without this, editing a showcase file and
+    // re-running gives a cached pass against the previous contents — the one failure mode that would
+    // let the showcase drift from its own assertions, which is the thing it exists to prevent.
+    inputs.dir(layout.projectDirectory.dir("samples/showcase/src"))
+            .withPropertyName("showcaseSources")
+            .withPathSensitivity(PathSensitivity.RELATIVE)
 }

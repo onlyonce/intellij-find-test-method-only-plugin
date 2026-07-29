@@ -3,11 +3,11 @@
 > 🤖 **100% vibecoded with Claude Opus 5.** Every line here — Java, Gradle, tests, this README — was
 > written by the model. See [Provenance](#provenance).
 
-An IntelliJ IDEA plugin that reports **production Java methods whose every caller lives in a test
-source root**.
+An IntelliJ IDEA plugin that reports **production Java declarations whose every caller lives in a test
+source root** — methods, fields, and whole classes.
 
-Such a method is production API kept alive only by the tests that assert on it: it inflates the public
-surface, blocks refactoring, and still counts as covered in coverage reports.
+Such a declaration is production API kept alive only by the tests that assert on it: it inflates the
+public surface, blocks refactoring, and still counts as covered in coverage reports.
 
 ## Why not just use *Unused declaration*?
 
@@ -25,7 +25,7 @@ leaving *Unused declaration* untouched.
 
 ## What it reports
 
-A method is reported when **all** of the following hold:
+A **method** is reported when **all** of the following hold:
 
 - it is declared in a production source root
 - it has at least one caller (a method with *no* callers is plain dead code — that is
@@ -34,19 +34,80 @@ A method is reported when **all** of the following hold:
 - no reference to it exists anywhere in production, including from XML, SpEL, `.properties` and
   javadoc
 
+A **field** follows the same rules, minus the override family — fields do not override. Note that a
+reference from the field's own class counts as production use: a field a production method maintains
+is in use, however else it is read.
+
+A **class** asks a wider question, and one different question. Wider, because the tally covers the
+class *and everything it declares*, nested classes included — a constant reached through a static
+import is a use of the class that never names it at the reference site. Different, because references
+that stay inside the class do not count:
+
+```java
+public class Builder {
+    public static Builder createDefault() { return new Builder(); }   // not a use of Builder
+}
+```
+
+A static factory returning its own type, a builder whose methods return `this`, an inner class the
+outer one instantiates — count those and no class is ever reported. So the class question is: does
+anything *outside* this class use it, or anything in it?
+
+When a class is reported, its own methods and fields are not. Otherwise the one finding that
+matters — delete the file — is buried under its own members.
+
 ### Excluded
 
-Constructors, `main`, record accessors, methods overriding library declarations, methods declared in
-test sources, and anything the platform considers an entry point. Entry points are resolved through
+Constructors, `main`, record accessors, methods overriding library declarations, declarations in test
+sources, and anything the platform considers an entry point. Entry points are resolved through
 `UnusedDeclarationInspectionBase.isEntryPoint` and `EntryPointsManager`, so every registered
 `EntryPoint` extension plus your *Settings → Editor → Inspections → Entry points* configuration is
 honoured — Spring `@Bean` / `@KafkaListener` / `@Scheduled` / `@EventListener`, JPA no-arg
-constructors and Jackson accessors are left alone.
+constructors and Jackson accessors are left alone. For a class, one entry-point member is enough:
+something outside the sources constructs it, and no caller will ever appear in the graph to say so.
 
-### Annotated methods — a configurable list
+Two more exclusions are specific to the new kinds:
 
-A method annotated as test-facing — or belonging to an annotated class — is not reported. Which
-annotations count is an editable list in the inspection settings, seeded with two groups:
+- **Enum constants and record components.** An enum constant can be produced without ever being
+  named — by `valueOf`, a deserializer, a JPA column mapping — so "no production reference" says
+  nothing about whether production uses it, and a finding the developer cannot disprove from the code
+  in front of them is worse than no finding.
+- **Nested, local and anonymous classes.** Only top-level classes are reported. For a nested class a
+  reference from the outer class is internal to the file and external to the nested type; the plugin
+  does not guess which reading you meant. Its members are still reported as members.
+
+Class and field reporting can each be switched off in the inspection settings, leaving the 0.1.0
+behaviour.
+
+### The class rule's known false positive
+
+A concrete class that production only ever reaches **through its interface**, and that is registered
+**reflectively rather than by annotation**, will be reported — because nothing in the sources names
+it:
+
+```java
+public interface Greeter { String greet(); }
+public class LoudGreeter implements Greeter { ... }     // reported, if nothing names it
+
+Greeter g = registry.lookup("loud");                    // the only production use
+```
+
+Annotation-driven wiring is safe: Spring `@Component` / `@Bean`, `@KafkaListener` and the rest are
+entry points, and one entry-point member keeps the whole class. A Spring XML `<bean class="...">` is
+safe too, because stage two searches XML like any other reference. What is *not* covered is
+registration the index cannot resolve to a class — `Class.forName` on a string literal, a name read
+from configuration, a hand-rolled registry keyed by string.
+
+If that describes your codebase, either annotate the implementations `@TestOnly`-style (the quick fix
+does it), register the marker under *Settings → Editor → Inspections → Entry points*, or turn class
+reporting off and keep methods and fields. This is the one place the class rule can say "delete this
+file" about a file you cannot delete, so it is worth knowing before you trust it.
+
+### Annotated declarations — a configurable list
+
+A declaration annotated as test-facing — or sitting inside an annotated class, at any nesting depth —
+is not reported. Which annotations count is an editable list in the inspection settings, seeded with
+two groups:
 
 *Knowingly test-facing*
 
@@ -66,53 +127,81 @@ annotations count is an editable list in the inspection settings, seeded with tw
 > helps here and a `GeneratedSourcesFilter` check would be a no-op. If your generator emits no marker
 > annotation, mark the folder as a generated source root in *Project Structure → Modules* instead.
 
-Remove them to report annotated methods anyway, or add your own conventions — the field offers
-annotation-name completion. An annotation on the containing class covers every method in it, and one
+Remove them to report annotated declarations anyway, or add your own conventions — the field offers
+annotation-name completion. An annotation on an enclosing class covers everything inside it, and one
 on an overridden declaration covers its overrides.
 
 This is deliberately not hard-coded. Teams have their own markers, and an inspection that ignores
 that would be noisiest on exactly the codebases most disciplined about acknowledging test-facing API.
 
-It also pairs with the built-in **Test-only usage in production code** inspection, which runs the
-other way round: ours finds the candidates, you annotate the ones worth keeping, and the built-in
-then stops production code from calling them.
+### The quick fix: annotate it
+
+Each finding offers *Annotate as `@TestOnly`* — or whichever of the configured annotations your module
+can actually resolve. This is the action the finding is usually asking for, because a test-only
+declaration is not automatically a mistake: sometimes the honest answer is "yes, this exists for the
+tests, and that is fine". Saying so in the source both silences this inspection and switches on the
+built-in **Test-only usage in production code**, which then stops production from calling it. Together
+the two inspections close the loop: ours finds the candidates, you annotate the ones worth keeping,
+and the built-in enforces the decision.
+
+Two gates stand in front of the fix, because a fix that leaves the file red is worse than no fix:
+
+- the annotation must **resolve from the declaration's own module** — no offering
+  `@VisibleForTesting` to a project without Guava
+- its `@Target` must **permit that kind of declaration** — no offering a field-only annotation on a
+  method. An annotation with no `@Target` is applicable everywhere, per JLS 9.6.4.1, which is how
+  Guava declares its own.
+
+Which annotations the fix will write is its own setting, separate from the ignore list. The lists
+answer different questions: the ignore list includes generated-code markers, and annotating
+hand-written code as `@Generated` would be a lie.
+
+Deleting is the other answer, and there is deliberately no fix for it — IntelliJ's own *Safe delete*
+does that better than a fix here could, because it shows you the test callers before anything goes.
 
 ## Usage
 
 1. `Settings → Plugins → ⚙ → Install Plugin from Disk…` → the built zip → restart
-2. `Settings → Editor → Inspections` → enable **Method used only from test code** (off by default)
+2. `Settings → Editor → Inspections` → enable **Declaration used only from test code** (off by default)
 3. `Analyze → Inspect Code…` → scope **Whole project**, **Include test sources** ticked
 4. Results appear under `Java → Declaration redundancy`
 
 > This is a global inspection. It runs only via *Inspect Code* — it will never highlight as you type.
 
-**The analysis scope must include test sources.** Without them every test-only method has zero callers
-and is indistinguishable from fully dead code, so the inspection refuses to run rather than guess.
+**The analysis scope must include test sources.** Without them every test-only declaration has zero
+callers and is indistinguishable from fully dead code, so the inspection refuses to run rather than
+guess.
 
 ## How it works
 
 Two stages, because the cheap one is imprecise and the precise one is expensive.
 
 1. **Graph pass.** The platform builds its `RefManager` reference graph once for the analysis scope.
-   A `RefGraphAnnotator` records, per method, whether it was referenced from production, from tests,
-   or both. This is done *during* graph construction rather than by reading `getInReferences()`
-   afterwards — reference building is lazy and iteration order is unspecified, so a post-hoc read can
-   see an incomplete caller set.
-2. **Index confirmation.** Only for methods stage one flagged, a `MethodReferencesSearch` over
+   A `RefGraphAnnotator` records, per declaration, whether it was referenced from production, from
+   tests, or both — and whether the reference crossed a top-level class boundary, which is what the
+   class rule needs and the member rules ignore. This is done *during* graph construction rather than
+   by reading `getInReferences()` afterwards — reference building is lazy and iteration order is
+   unspecified, so a post-hoc read can see an incomplete caller set.
+2. **Index confirmation.** Only for declarations stage one flagged, a search over
    `projectProductionScope` confirms the verdict. This catches references the Java reference graph
-   never records: Spring XML, SpEL, `.properties` wiring, javadoc `@link`.
+   never records: Spring XML, SpEL, `.properties` wiring, javadoc `@link`. For a class the search
+   covers its members too, and skips hits inside the class itself.
 
-Because stage two runs over a shortlist rather than every method, the per-method index search stays
-affordable on a large codebase.
+Because stage two runs over a shortlist rather than every declaration, the per-declaration index
+search stays affordable on a large codebase. The class verdict is memoised for the same reason: every
+member of a candidate class asks the same question, and the answer costs one search per member.
 
 ## What it catches, by example
 
 [`samples/showcase`](samples/showcase) is a small project with a real production and test source
-root, holding one deliberately-unused method per case the inspection handles — and one per exclusion.
+root, holding one deliberately-unused declaration per case the inspection handles — and one per
+exclusion.
 
 It is not a demo folder. `ShowcaseInspectionTest` loads those same files and asserts the findings are
-exactly the methods annotated `@ExpectedFinding`, so the examples cannot drift away from the
-behaviour they describe. Its [README](samples/showcase/README.md) tabulates every case.
+exactly the declarations annotated `@ExpectedFinding`, so the examples cannot drift away from the
+behaviour they describe. Its [README](samples/showcase/README.md) tabulates every case. That
+"exactly" also pins the roll-up rule for free: the members of a reported class carry no annotation of
+their own, so reporting them alongside their class fails the same assertion.
 
 It earned its keep immediately: the first run exposed a real defect — an unused overload was being
 masked by a production call to its sibling. See the showcase README for the details.
@@ -144,12 +233,19 @@ upload is manual, later ones are `./gradlew publishPlugin`.
 ## Status
 
 **Requires IntelliJ IDEA 2023.3 or newer** (any edition — the inspection only needs the bundled Java
-plugin). The plugin verifier reports *Compatible* against IC-233, IC-241, IC-242, IC-243, IC-251,
-IC-252 and IU-261. Ten fixture tests cover the reporting and exclusion rules.
+plugin). The plugin verifier reports *Compatible* against IC-233, IC-241, IC-242, IC-243, IC-251 and
+IC-252. 38 fixture tests cover the reporting rules, the exclusions and the quick fix; each guard was
+mutation-checked by breaking it and confirming a specific test failed.
 
-Confirmed working on a real-world Spring project, including the exclusions the fixture tests cannot
-reach: framework entry points, which depend on plugins absent from the test classpath, and generated
-Avro sources suppressed through the annotation list.
+The method rule is confirmed working on a real-world Spring project, including the exclusions the
+fixture tests cannot reach: framework entry points, which depend on plugins absent from the test
+classpath, and generated Avro sources suppressed through the annotation list.
+
+0.3.1 was installed and exercised in a running IDE before release. What that does *not* yet cover is
+the class rule at scale: it has fixture and showcase coverage, but has not been run across a large
+codebase where the false positive described
+[above](#the-class-rules-known-false-positive) would have room to appear. Treat the first run on a big
+project as the real test, and switch class reporting off if it turns out noisy on yours.
 
 Still unverified: a headless `inspect.sh` / Qodana run. The CI path has never been executed end to
 end, so treat the batch/CI usage as untested.
@@ -160,7 +256,8 @@ This plugin is **100% vibecoded with Claude Opus 5**, via Claude Code. No line o
 configuration, test code or documentation in this repository was written by hand. The human role was
 to state the goal — *"find Java methods that are only called from test code"* — decide two design
 questions (direct-caller vs. transitive semantics; inspection-only vs. inspection plus a report UI),
-and review the result.
+and review the result. 0.3 was the same arrangement: the human picked which two of six proposed
+extensions to build.
 
 That is worth stating plainly rather than hiding, because "vibecoded" usually implies unverified. Here
 is what was actually done to earn confidence:
@@ -175,8 +272,16 @@ is what was actually done to earn confidence:
 - **The tests were mutation-checked, not just run green.** Each guard was verified by deliberately
   breaking the code and confirming that exactly the intended test failed. This mattered: under a
   broken annotator, six of the tests still passed — a suite of only "not reported" assertions would
-  have been theatre.
-- Ten fixture tests, `verifyPlugin` compatibility against two IDE builds.
+  have been theatre. It kept earning its keep in 0.3: two mutations of the field rule *survived*,
+  which turned out to be a genuine redundancy between the graph tally and the index confirmation
+  rather than a gap — and it exposed one test that was passing without exercising the code it named,
+  because the mock JDK ships no `java.lang.annotation.Target`.
+- **The quick fix was designed against the platform's own wiring, not an assumption.** That a
+  `LocalQuickFix` on a *global* inspection's descriptor is offered at all is not obvious —
+  `DefaultInspectionToolPresentation.getQuickFixes` returns empty for every tool. It works because
+  `InspectionRVContentProviderImpl.getCommonQuickFixes` reads `descriptor.getFixes()` directly, which
+  was read at the 233 tag before the feature was written rather than hoped for afterwards.
+- 38 fixture tests, `verifyPlugin` compatibility against six IDE builds.
 
 Known gaps are recorded honestly in [Status](#status) rather than glossed over.
 

@@ -5,9 +5,23 @@
 
     <description><![CDATA[
         <p>
-        Reports <b>production Java methods whose every caller lives in a test source root</b> —
-        production API kept alive only by the tests that assert on it. Such a method inflates the
+        Reports <b>production Java declarations whose every caller lives in a test source root</b> —
+        production API kept alive only by the tests that assert on it. Such a declaration inflates the
         public surface, blocks refactoring, and still counts as covered in coverage reports.
+        </p>
+
+        <p>
+        Methods, fields and whole classes are reported. When a class turns out to exist only for the
+        tests, it is reported once as a class rather than once per member, so the finding that matters
+        — delete the file — is not buried under its own methods.
+        </p>
+
+        <p>
+        Each finding offers a quick fix that annotates the declaration as test-facing
+        (<code>@TestOnly</code>, either <code>@VisibleForTesting</code>), which both silences this
+        inspection and switches on the built-in <em>Test-only usage in production code</em> so
+        production can no longer call it. Only annotations that resolve on the module's classpath are
+        offered.
         </p>
 
         <p><b>Why not just use <em>Unused declaration</em>?</b></p>
@@ -26,7 +40,7 @@
 
         <p><b>What is excluded</b></p>
         <ul>
-            <li>Methods with no callers at all — that is plain dead code, and
+            <li>Declarations with no callers at all — that is plain dead code, and
                 <em>Unused declaration</em>'s job.</li>
             <li>Framework entry points, resolved through the platform's own registered entry points and
                 your <em>Settings | Editor | Inspections | Entry points</em> configuration — so
@@ -35,10 +49,16 @@
                 left alone.</li>
             <li>Constructors, <code>main</code>, record accessors, and methods overriding library
                 declarations.</li>
-            <li>Methods carrying an annotation from an <b>editable list</b>, seeded with
+            <li>Enum constants and record components, whose only source reference can legitimately be
+                the test that names them while production reaches them through
+                <code>valueOf</code>, a deserializer or a column mapping.</li>
+            <li>Nested, local and anonymous classes. Only top-level classes are reported, because a
+                reference from the outer class is internal to the file but external to the nested one,
+                and the plugin will not guess which reading you meant.</li>
+            <li>Declarations carrying an annotation from an <b>editable list</b>, seeded with
                 <code>@TestOnly</code>, both <code>@VisibleForTesting</code> variants, and generated-code
                 markers (<code>@Generated</code>, <code>@AvroGenerated</code>). Add your own team's
-                conventions, or remove entries to report annotated methods anyway.</li>
+                conventions, or remove entries to report annotated declarations anyway.</li>
         </ul>
 
         <p>
@@ -48,11 +68,12 @@
 
         <p><b>How to run it</b></p>
         <ul>
-            <li>Enable <b>Method used only from test code</b> in
-                <em>Settings | Editor | Inspections</em> — it is <b>off by default</b>.</li>
+            <li>Enable <b>Declaration used only from test code</b> in
+                <em>Settings | Editor | Inspections</em> — it is <b>off by default</b>. Class and field
+                reporting can be switched off there separately, leaving methods only.</li>
             <li>Run <em>Analyze | Inspect Code</em> with <b>test sources included</b> in the scope.
-                Without them, a test-only method is indistinguishable from a fully dead one, and the
-                inspection refuses to guess.</li>
+                Without them, a test-only declaration is indistinguishable from a fully dead one, and
+                the inspection refuses to guess.</li>
             <li>This is a <b>global inspection</b>: it runs only via <em>Inspect Code</em> and will
                 never highlight as you type.</li>
         </ul>
@@ -65,6 +86,24 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <b>0.3.1</b>
+        <ul>
+            <li>Reports <b>fields</b> and <b>whole classes</b> used only from test code, not just
+                methods. A class that exists only for the tests is reported once, and its own methods
+                and fields are not reported underneath it.</li>
+            <li>A class counts as used only when something <em>outside</em> it refers to it or to
+                anything it declares — a static factory returning its own type no longer keeps it
+                alive. Only top-level classes are considered.</li>
+            <li>New <b>quick fix</b>: annotate the declaration as test-facing. Offered only for
+                annotations that resolve on the module's classpath and whose <code>@Target</code>
+                permits that kind of declaration, so the fix can never leave the file uncompilable.</li>
+            <li>Class and field reporting can each be switched off in the inspection settings.</li>
+            <li>An annotation on any enclosing class now suppresses reporting, not only on the
+                immediately containing one.</li>
+            <li>Renamed to <b>Declaration used only from test code</b>. The suppression id and profile
+                key are unchanged, so existing settings carry over.</li>
+        </ul>
+
         <b>0.1.0</b>
         <ul>
             <li>Initial release.</li>
@@ -85,7 +124,7 @@
         <globalInspection
                 language="JAVA"
                 shortName="MethodUsedOnlyFromTests"
-                displayName="Method used only from test code"
+                displayName="Declaration used only from test code"
                 groupPath="Java"
                 bundle="messages.InspectionsBundle"
                 groupKey="group.names.declaration.redundancy"

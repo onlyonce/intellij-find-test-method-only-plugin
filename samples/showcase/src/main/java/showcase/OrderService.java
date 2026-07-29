@@ -6,9 +6,35 @@ package showcase;
  */
 public class OrderService {
 
+    /**
+     * A constant kept because a test asserts against it. Nothing in production reads it — the rate is
+     * written out again as a literal below — so it is dead weight that still looks like public API.
+     * <p>
+     * Note the wording: a javadoc {@code @link} to a declaration is a production reference like any
+     * other, and naming the method here would suppress its finding. That is the point of stage two,
+     * and it applies to this file too.
+     */
+    @ExpectedFinding("constant read only from the test source root")
+    public static final long LEGACY_VAT_PERCENT = 19;
+
+    /** Control: read from {@link ProductionCaller}, so it is genuinely in use. */
+    public static final long MAX_QUANTITY = 999;
+
+    /**
+     * Control for the rule that a field's own class counts as production use. The test reads this
+     * one, so a rule that only looked outside the class would report it — but {@link #netTotal}
+     * writes it, and {@code netTotal} is production code. A field a production method maintains is in
+     * use, whatever else reads it.
+     * <p>
+     * This is where fields differ from classes: for a class, a reference from inside itself is the
+     * class existing rather than the class being used, and is ignored.
+     */
+    long lastNetTotal;
+
     /** Control: called from {@link ProductionCaller}, so it is genuinely in use. */
     public long netTotal(long unitPrice, int quantity) {
-        return unitPrice * quantity;
+        lastNetTotal = unitPrice * quantity;
+        return lastNetTotal;
     }
 
     @ExpectedFinding("public method whose only caller is a test class")

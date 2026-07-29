@@ -18,9 +18,29 @@ public class OrderServiceTest {
         // Production also uses these two, so they must stay unreported.
         service.netTotal(100, 3);
         service.discount(1000);
+
+        // The only read of this constant anywhere.
+        System.out.println(OrderService.LEGACY_VAT_PERCENT);
+
+        // A whole class no production file names.
+        System.out.println(LegacyPricingTable.createDefault().lookup(3));
     }
 
-    public void exercisesTheExclusions() {
+    public void exercisesTheFieldExclusions() {
+        OrderService service = new OrderService();
+
+        // The only read of this field, but netTotal writes it — production is using it.
+        service.netTotal(100, 3);
+        System.out.println(service.lastNetTotal);
+
+        // ProductionCaller reads this one too, so it is in ordinary use.
+        System.out.println(OrderService.MAX_QUANTITY);
+
+        // Named only here — enum constants are never reported.
+        System.out.println(Channel.WEB);
+    }
+
+    public void exercisesTheDeclarationExclusions() {
         // Constructor: only tests instantiate it.
         Exclusions exclusions = new Exclusions();
         System.out.println(exclusions);

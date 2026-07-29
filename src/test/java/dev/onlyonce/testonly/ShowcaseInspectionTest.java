@@ -4,15 +4,16 @@ import com.intellij.analysis.AnalysisScope;
 import com.intellij.codeInspection.InspectionToolResultExporter;
 import com.intellij.codeInspection.ex.GlobalInspectionToolWrapper;
 import com.intellij.codeInspection.reference.RefEntity;
-import com.intellij.codeInspection.reference.RefMethod;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.psi.PsiAnnotation;
 import com.intellij.psi.PsiClass;
+import com.intellij.psi.PsiField;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.psi.PsiMethod;
 import com.intellij.psi.PsiModifierList;
+import com.intellij.psi.PsiModifierListOwner;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.testFramework.InspectionTestUtil;
 import com.intellij.testFramework.InspectionsKt;
@@ -33,8 +34,11 @@ import java.util.TreeSet;
 import java.util.stream.Stream;
 
 /**
- * Runs the inspection over {@code samples/showcase} and asserts the findings are exactly the methods
- * annotated {@code @ExpectedFinding}.
+ * Runs the inspection over {@code samples/showcase} and asserts the findings are exactly the
+ * declarations annotated {@code @ExpectedFinding}.
+ * <p>
+ * "Exactly" is what pins the roll-up rule: the members of a class reported as test-only carry no
+ * annotation of their own, so reporting them alongside their class fails here.
  * <p>
  * This exists so the sample project cannot become decorative. The showcase is browsable Java used for
  * documentation and for the Marketplace screenshot; without an assertion tied to the same files it
@@ -59,7 +63,7 @@ public class ShowcaseInspectionTest extends LightJavaCodeInsightFixtureTestCase 
     protected void tearDown() throws Exception {
         try {
             productionFiles.clear();
-            TestOnlyMethodInspectionTest.cleanTestSourceRoot();
+            InspectionFixtureTestCase.cleanTestSourceRoot();
         } catch (Throwable t) {
             addSuppressedException(t);
         } finally {
@@ -67,13 +71,13 @@ public class ShowcaseInspectionTest extends LightJavaCodeInsightFixtureTestCase 
         }
     }
 
-    public void testShowcaseFindingsMatchTheAnnotatedMethods() throws IOException {
+    public void testShowcaseFindingsMatchTheAnnotatedDeclarations() throws IOException {
         Path showcase = showcaseRoot();
         loadProduction(showcase.resolve("src/main/java"));
         loadTests(showcase.resolve("src/test/java"));
 
-        Set<String> expected = methodsAnnotatedExpectedFinding();
-        assertFalse("no @ExpectedFinding methods found — the showcase did not load", expected.isEmpty());
+        Set<String> expected = declarationsAnnotatedExpectedFinding();
+        assertFalse("no @ExpectedFinding declarations found — the showcase did not load", expected.isEmpty());
 
         Set<String> reported = runInspection();
 
@@ -120,7 +124,7 @@ public class ShowcaseInspectionTest extends LightJavaCodeInsightFixtureTestCase 
 
     // ------------------------------------------------------------ expectation
 
-    private Set<String> methodsAnnotatedExpectedFinding() {
+    private Set<String> declarationsAnnotatedExpectedFinding() {
         Set<String> expected = new TreeSet<>();
         for (PsiFile file : productionFiles) {
             for (PsiMethod method : PsiTreeUtil.findChildrenOfType(file, PsiMethod.class)) {
@@ -128,12 +132,25 @@ public class ShowcaseInspectionTest extends LightJavaCodeInsightFixtureTestCase 
                     expected.add(key(method));
                 }
             }
+            for (PsiField field : PsiTreeUtil.findChildrenOfType(file, PsiField.class)) {
+                if (hasExpectedFindingAnnotation(field)) {
+                    expected.add(key(field));
+                }
+            }
+            for (PsiClass psiClass : PsiTreeUtil.findChildrenOfType(file, PsiClass.class)) {
+                if (hasExpectedFindingAnnotation(psiClass)) {
+                    expected.add(key(psiClass));
+                }
+            }
         }
         return expected;
     }
 
-    private static boolean hasExpectedFindingAnnotation(PsiMethod method) {
-        PsiModifierList modifiers = method.getModifierList();
+    private static boolean hasExpectedFindingAnnotation(PsiModifierListOwner declaration) {
+        PsiModifierList modifiers = declaration.getModifierList();
+        if (modifiers == null) {
+            return false;
+        }
         for (PsiAnnotation annotation : modifiers.getAnnotations()) {
             String qualifiedName = annotation.getQualifiedName();
             if (qualifiedName != null && qualifiedName.endsWith(EXPECTED_FINDING_ANNOTATION)) {
@@ -164,20 +181,23 @@ public class ShowcaseInspectionTest extends LightJavaCodeInsightFixtureTestCase 
         InspectionToolResultExporter presentation = context.getPresentation(wrapper);
         Set<String> reported = new TreeSet<>();
         for (RefEntity entity : presentation.getProblemElements().keys()) {
-            if (!(entity instanceof RefMethod)) {
-                continue;
-            }
-            PsiMethod method = TestOnlyMethodDetector.asPsiMethod((RefMethod) entity);
-            if (method != null) {
-                reported.add(key(method));
+            String key = ReportedDeclarations.keyOf(entity);
+            if (key != null) {
+                reported.add(key);
             }
         }
         return reported;
     }
 
     private static String key(PsiMethod method) {
-        PsiClass owner = method.getContainingClass();
-        return (owner == null ? "?" : owner.getName()) + "." + method.getName()
-                + "/" + method.getParameterList().getParametersCount();
+        return ReportedDeclarations.methodKey(method);
+    }
+
+    private static String key(PsiField field) {
+        return ReportedDeclarations.fieldKey(field);
+    }
+
+    private static String key(PsiClass psiClass) {
+        return ReportedDeclarations.classKey(psiClass);
     }
 }

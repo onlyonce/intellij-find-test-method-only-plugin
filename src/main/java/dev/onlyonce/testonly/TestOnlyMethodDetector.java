@@ -1,16 +1,8 @@
 package dev.onlyonce.testonly;
 
-import com.intellij.codeInsight.AnnotationUtil;
-import com.intellij.codeInspection.deadCode.UnusedDeclarationInspectionBase;
-import com.intellij.codeInspection.ex.EntryPointsManager;
 import com.intellij.codeInspection.reference.RefMethod;
-import com.intellij.openapi.project.Project;
-import com.intellij.openapi.roots.TestSourcesFilter;
-import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.psi.PsiClass;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiMethod;
-import com.intellij.psi.util.PsiUtilCore;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -45,10 +37,10 @@ final class TestOnlyMethodDetector {
                 || refMethod.isTestMethod()) {
             return false;
         }
-        if (isInTestSources(psiMethod)) {
+        if (TestOnlyRules.isInTestSources(psiMethod)) {
             return false;
         }
-        if (isAcknowledgedAsTestFacing(psiMethod, ignoredAnnotations)) {
+        if (TestOnlyRules.isAcknowledgedAsTestFacing(psiMethod, ignoredAnnotations, true)) {
             return false;
         }
 
@@ -58,7 +50,13 @@ final class TestOnlyMethodDetector {
         boolean anyProductionCaller = false;
         boolean anyTestCaller = false;
         for (RefMethod member : collectOverrideFamily(refMethod)) {
-            if (isEntryPoint(member)) {
+            // isEntry first: it is a field read, where the delegating check walks every registered
+            // EntryPoint extension. On a wide override family that ordering is the difference.
+            if (member.isEntry()) {
+                return false;
+            }
+            PsiMethod memberPsi = asPsiMethod(member);
+            if (memberPsi != null && TestOnlyRules.isEntryPoint(memberPsi)) {
                 return false;
             }
             CallerOrigins.Origins memberOrigins = origins.get(member);
@@ -71,27 +69,6 @@ final class TestOnlyMethodDetector {
 
         // No callers at all is plain dead code — that belongs to the Unused declaration inspection.
         return anyTestCaller && !anyProductionCaller;
-    }
-
-    /**
-     * Whether the author has already declared this method test-facing, using one of the annotations
-     * configured in the inspection settings.
-     * <p>
-     * The containing class is checked too, because {@code @TestOnly} and friends target types as well
-     * as methods — a method inside a class marked test-only is covered by that declaration.
-     * {@code CHECK_HIERARCHY} means an annotation on an overridden declaration counts, so marking an
-     * interface method once is enough.
-     */
-    private static boolean isAcknowledgedAsTestFacing(@NotNull PsiMethod psiMethod,
-                                                      @NotNull Collection<String> ignoredAnnotations) {
-        if (ignoredAnnotations.isEmpty()) {
-            return false;
-        }
-        if (AnnotationUtil.isAnnotated(psiMethod, ignoredAnnotations, AnnotationUtil.CHECK_HIERARCHY)) {
-            return true;
-        }
-        PsiClass owner = psiMethod.getContainingClass();
-        return owner != null && AnnotationUtil.isAnnotated(owner, ignoredAnnotations, 0);
     }
 
     @Nullable
@@ -113,38 +90,5 @@ final class TestOnlyMethodDetector {
             pending.addAll(current.getDerivedMethods());
         }
         return family;
-    }
-
-    /**
-     * Delegates to the platform rather than hand-rolling an annotation list, so every registered
-     * {@code EntryPoint} extension and everything configured under
-     * <i>Settings | Editor | Inspections | Entry points</i> is honoured — Spring, JPA, Jackson and
-     * the rest come for free.
-     * <p>
-     * Note {@link UnusedDeclarationInspectionBase#isEntryPoint(PsiElement)} is not subject to the
-     * {@code TEST_ENTRY_POINTS} gate; that gate lives in {@code RefJavaManagerImpl.isEntryPoint}, so
-     * calling this directly gives the unfiltered answer regardless of how the user configured
-     * <i>Unused declaration</i>.
-     */
-    private static boolean isEntryPoint(@NotNull RefMethod refMethod) {
-        if (refMethod.isEntry()) {
-            return true;
-        }
-        PsiMethod psiMethod = asPsiMethod(refMethod);
-        if (psiMethod == null) {
-            return false;
-        }
-        Project project = psiMethod.getProject();
-        if (EntryPointsManager.getInstance(project).isEntryPoint(psiMethod)) {
-            return true;
-        }
-        UnusedDeclarationInspectionBase deadCodeTool =
-                UnusedDeclarationInspectionBase.findUnusedDeclarationInspection(psiMethod);
-        return deadCodeTool != null && deadCodeTool.isEntryPoint(psiMethod);
-    }
-
-    static boolean isInTestSources(@NotNull PsiMethod psiMethod) {
-        VirtualFile file = PsiUtilCore.getVirtualFile(psiMethod);
-        return file != null && TestSourcesFilter.isTestSources(file, psiMethod.getProject());
     }
 }

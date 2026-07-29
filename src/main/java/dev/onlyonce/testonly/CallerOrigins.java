@@ -4,7 +4,9 @@ import com.intellij.codeInspection.reference.RefElement;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.TestSourcesFilter;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.PsiClass;
 import com.intellij.psi.PsiElement;
+import com.intellij.psi.PsiFile;
 import com.intellij.psi.util.PsiUtilCore;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -25,10 +27,21 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 final class CallerOrigins {
 
-    /** Mutable per-callee bits. Both fields are set-once-to-true, so volatile writes suffice. */
+    /**
+     * Mutable per-callee bits. Every field is set-once-to-true, so volatile writes suffice.
+     * <p>
+     * Two pairs, because members and whole classes ask different questions. A member asks "does
+     * anything in production use me", and a call from a sibling method is a real production use. A
+     * class asks "does anything <em>outside me</em> use me" — a static factory returning its own type
+     * is the class existing, not the class being used, and counting it would mean no class is ever
+     * reported. The {@code external} pair is the same tally with same-top-level-class references
+     * dropped.
+     */
     static final class Origins {
         volatile boolean production;
         volatile boolean test;
+        volatile boolean externalProduction;
+        volatile boolean externalTest;
 
         boolean hasProductionCaller() {
             return production;
@@ -36,6 +49,14 @@ final class CallerOrigins {
 
         boolean hasTestCaller() {
             return test;
+        }
+
+        boolean hasExternalProductionCaller() {
+            return externalProduction;
+        }
+
+        boolean hasExternalTestCaller() {
+            return externalTest;
         }
     }
 
@@ -50,16 +71,62 @@ final class CallerOrigins {
             return;
         }
         Origins origins = byCallee.computeIfAbsent(callee, key -> new Origins());
-        if (isInTestSources(caller, project)) {
+        boolean fromTest = isInTestSources(caller, project);
+        boolean external = isExternal(callee, caller);
+        if (fromTest) {
             origins.test = true;
+            if (external) {
+                origins.externalTest = true;
+            }
         } else {
             origins.production = true;
+            if (external) {
+                origins.externalProduction = true;
+            }
         }
     }
 
     @Nullable
     Origins get(@NotNull RefElement callee) {
         return byCallee.get(callee);
+    }
+
+    /**
+     * Whether the reference crosses a top-level class boundary.
+     * <p>
+     * The boundary is the <em>top-level</em> class rather than the immediately declaring one, so that
+     * a nested class and its outer class count as one unit. That is what makes the bit meaningful
+     * without knowing which class will later be asked about: for any top-level class {@code C}, a
+     * reference is internal exactly when both ends sit inside {@code C}.
+     * <p>
+     * Anything that cannot be placed in a class is treated as external, which can only make a finding
+     * less likely.
+     */
+    private static boolean isExternal(@NotNull RefElement callee, @NotNull RefElement caller) {
+        PsiClass calleeOwner = topLevelClassOf(callee.getPsiElement());
+        PsiClass callerOwner = topLevelClassOf(caller.getPsiElement());
+        return calleeOwner == null || callerOwner == null || !calleeOwner.equals(callerOwner);
+    }
+
+    /**
+     * The outermost class enclosing {@code psi}, or {@code psi} itself when it is already one.
+     * <p>
+     * Walks parents directly rather than going through {@code PsiUtil}, which keeps this to
+     * {@link PsiElement#getParent()} — the one part of the PSI surface that cannot move.
+     */
+    @Nullable
+    static PsiClass topLevelClassOf(@Nullable PsiElement psi) {
+        if (psi == null) {
+            return null;
+        }
+        PsiClass outermost = psi instanceof PsiClass ? (PsiClass) psi : null;
+        for (PsiElement current = psi.getParent(); current != null && !(current instanceof PsiFile);
+             current = current.getParent()) {
+            if (current instanceof PsiClass) {
+                outermost = (PsiClass) current;
+            }
+        }
+        return outermost;
     }
 
     /**

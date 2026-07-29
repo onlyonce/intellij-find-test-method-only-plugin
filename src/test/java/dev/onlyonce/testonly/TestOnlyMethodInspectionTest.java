@@ -1,30 +1,10 @@
 package dev.onlyonce.testonly;
 
-import com.intellij.analysis.AnalysisScope;
-import com.intellij.codeInspection.InspectionToolResultExporter;
 import com.intellij.codeInspection.ex.EntryPointsManagerBase;
-import com.intellij.codeInspection.ex.GlobalInspectionToolWrapper;
-import com.intellij.codeInspection.reference.RefEntity;
-import com.intellij.codeInspection.reference.RefMethod;
-import com.intellij.openapi.application.WriteAction;
-import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.openapi.vfs.VirtualFileManager;
-import com.intellij.psi.PsiClass;
-import com.intellij.psi.PsiMethod;
-import com.intellij.testFramework.InspectionTestUtil;
-import com.intellij.testFramework.InspectionsKt;
-import com.intellij.testFramework.LightProjectDescriptor;
-import com.intellij.testFramework.VfsTestUtil;
-import com.intellij.testFramework.fixtures.LightJavaCodeInsightFixtureTestCase;
-import com.intellij.testFramework.fixtures.impl.GlobalInspectionContextForTests;
-import org.jetbrains.annotations.NotNull;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Consumer;
 import java.util.Set;
-import java.util.TreeSet;
 
 /**
  * Every case here is one of the exclusion rules in {@link TestOnlyMethodDetector}.
@@ -32,26 +12,13 @@ import java.util.TreeSet;
  * Note {@link #testReportsMethodCalledOnlyFromTestSources()} is the load-bearing one: it is the only
  * assertion that fails if the {@code RefGraphAnnotator} never fires. A suite made only of
  * "not reported" assertions would pass with the annotator wired to the wrong overload.
+ * <p>
+ * Each fixture class here is deliberately given a production caller of its own. Without one the class
+ * would itself be used only from tests, the class rule would report it, and the roll-up would swallow
+ * the method finding these tests are about — a green suite proving the wrong thing. The class rule
+ * gets its own tests in {@link TestOnlyClassInspectionTest}.
  */
-public class TestOnlyMethodInspectionTest extends LightJavaCodeInsightFixtureTestCase {
-
-    private static final LightProjectDescriptor DESCRIPTOR = new TwoRootProjectDescriptor();
-
-    @Override
-    protected @NotNull LightProjectDescriptor getProjectDescriptor() {
-        return DESCRIPTOR;
-    }
-
-    @Override
-    protected void tearDown() throws Exception {
-        try {
-            cleanTestSourceRoot();
-        } catch (Throwable t) {
-            addSuppressedException(t);
-        } finally {
-            super.tearDown();
-        }
-    }
+public class TestOnlyMethodInspectionTest extends InspectionFixtureTestCase {
 
     // ------------------------------------------------------------------ cases
 
@@ -76,7 +43,7 @@ public class TestOnlyMethodInspectionTest extends LightJavaCodeInsightFixtureTes
                 }
                 """);
 
-        assertEquals(Set.of("Service.onlyTestsCallThis"), runInspection(true));
+        assertEquals(Set.of("method Service.onlyTestsCallThis/0"), runInspection(true));
     }
 
     /**
@@ -93,6 +60,7 @@ public class TestOnlyMethodInspectionTest extends LightJavaCodeInsightFixtureTes
         production("AService.java", """
                 public class AService {
                     public int onlyTestsCallThis() { return 1; }
+                    public int usedInProduction() { return 2; }
                 }
                 """);
         for (int i = 0; i < 12; i++) {
@@ -103,13 +71,18 @@ public class TestOnlyMethodInspectionTest extends LightJavaCodeInsightFixtureTes
                     }
                     """.formatted(i, i));
         }
+        production("AServiceCaller.java", """
+                public class AServiceCaller {
+                    public int go() { return new AService().usedInProduction(); }
+                }
+                """);
         inTestSources("ZzzServiceTest.java", """
                 public class ZzzServiceTest {
                     public void checks() { new AService().onlyTestsCallThis(); }
                 }
                 """);
 
-        assertEquals(Set.of("AService.onlyTestsCallThis"), runInspection(true));
+        assertEquals(Set.of("method AService.onlyTestsCallThis/0"), runInspection(true));
     }
 
     public void testDoesNotReportMethodWithoutAnyCaller() {
@@ -169,6 +142,8 @@ public class TestOnlyMethodInspectionTest extends LightJavaCodeInsightFixtureTes
                 }
                 """);
 
+        // Boot is not reported as a class either: main is an entry point, so something outside the
+        // project calls into it.
         assertEquals(Set.of(), runInspection(true));
     }
 
@@ -204,6 +179,7 @@ public class TestOnlyMethodInspectionTest extends LightJavaCodeInsightFixtureTes
         production("GreeterUser.java", """
                 public class GreeterUser {
                     public String go(Greeter g) { return g.greet(); }
+                    public Greeter make() { return new LoudGreeter(); }
                 }
                 """);
         inTestSources("GreeterTest.java", """
@@ -226,11 +202,14 @@ public class TestOnlyMethodInspectionTest extends LightJavaCodeInsightFixtureTes
         production("Api.java", """
                 public class Api {
                     public int onlyTestsCallThis() { return 1; }
+                    public int usedInProduction() { return 2; }
                 }
                 """);
         production("Docs.java", """
                 /** See {@link Api#onlyTestsCallThis()} for the legacy behaviour. */
-                public class Docs { }
+                public class Docs {
+                    public int go() { return new Api().usedInProduction(); }
+                }
                 """);
         inTestSources("ApiTest.java", """
                 public class ApiTest {
@@ -265,6 +244,12 @@ public class TestOnlyMethodInspectionTest extends LightJavaCodeInsightFixtureTes
                 public class Beans {
                     @Wired
                     public int frameworkCallsThis() { return 1; }
+                    public int usedInProduction() { return 2; }
+                }
+                """);
+        production("BeansCaller.java", """
+                public class BeansCaller {
+                    public int go() { return new Beans().usedInProduction(); }
                 }
                 """);
         inTestSources("BeansTest.java", """
@@ -274,7 +259,7 @@ public class TestOnlyMethodInspectionTest extends LightJavaCodeInsightFixtureTes
                 """);
 
         assertEquals("without the annotation registered this must be a candidate",
-                Set.of("Beans.frameworkCallsThis"), runInspection(true));
+                Set.of("method Beans.frameworkCallsThis/0"), runInspection(true));
 
         EntryPointsManagerBase entryPoints = EntryPointsManagerBase.getInstance(getProject());
         entryPoints.ADDITIONAL_ANNOTATIONS.add("Wired");
@@ -302,6 +287,12 @@ public class TestOnlyMethodInspectionTest extends LightJavaCodeInsightFixtureTes
                 public class Api {
                     @acme.KeptForTests
                     public int onlyTestsCallThis() { return 1; }
+                    public int usedInProduction() { return 2; }
+                }
+                """);
+        production("ApiCaller.java", """
+                public class ApiCaller {
+                    public int go() { return new Api().usedInProduction(); }
                 }
                 """);
         inTestSources("ApiTest.java", """
@@ -311,7 +302,8 @@ public class TestOnlyMethodInspectionTest extends LightJavaCodeInsightFixtureTes
                 """);
 
         assertEquals("with an empty list the method must still be reported",
-                Set.of("Api.onlyTestsCallThis"), runInspection(true, i -> i.ignoredAnnotations = new ArrayList<>()));
+                Set.of("method Api.onlyTestsCallThis/0"),
+                runInspection(true, i -> i.ignoredAnnotations = new ArrayList<>()));
         assertEquals("configuring the annotation must suppress it",
                 Set.of(), runInspection(true, i -> i.ignoredAnnotations = new ArrayList<>(List.of("acme.KeptForTests"))));
     }
@@ -330,6 +322,12 @@ public class TestOnlyMethodInspectionTest extends LightJavaCodeInsightFixtureTes
                 @acme.KeptForTests
                 public class Fixtures {
                     public int buildSample() { return 1; }
+                    public int usedInProduction() { return 2; }
+                }
+                """);
+        production("FixturesCaller.java", """
+                public class FixturesCaller {
+                    public int go() { return new Fixtures().usedInProduction(); }
                 }
                 """);
         inTestSources("FixturesTest.java", """
@@ -339,9 +337,47 @@ public class TestOnlyMethodInspectionTest extends LightJavaCodeInsightFixtureTes
                 """);
 
         assertEquals("without the annotation configured the method must be reported",
-                Set.of("Fixtures.buildSample"), runInspection(true, i -> i.ignoredAnnotations = new ArrayList<>()));
+                Set.of("method Fixtures.buildSample/0"),
+                runInspection(true, i -> i.ignoredAnnotations = new ArrayList<>()));
         assertEquals("a class-level annotation must cover its methods",
                 Set.of(), runInspection(true, i -> i.ignoredAnnotations = new ArrayList<>(List.of("acme.KeptForTests"))));
+    }
+
+    /**
+     * The annotation walk goes out through every enclosing class, not just the immediately declaring
+     * one — otherwise marking an outer class test-facing would leave the methods of its nested classes
+     * reported, which is not what anyone means by annotating the outer class.
+     */
+    public void testConfiguredAnnotationOnOuterClassCoversNestedClasses() {
+        production("acme/KeptForTests.java", """
+                package acme;
+                public @interface KeptForTests { }
+                """);
+        production("Outer.java", """
+                @acme.KeptForTests
+                public class Outer {
+                    public static class Nested {
+                        public int buildSample() { return 1; }
+                    }
+                }
+                """);
+        inTestSources("OuterTest.java", """
+                public class OuterTest {
+                    public void checks() { new Outer.Nested().buildSample(); }
+                }
+                """);
+
+        assertEquals("without the annotation configured the nested method must be reported",
+                Set.of("method Nested.buildSample/0"),
+                runInspection(true, i -> {
+                    i.ignoredAnnotations = new ArrayList<>();
+                    i.reportClasses = false;
+                }));
+        assertEquals("an annotation on the outer class must cover the nested one",
+                Set.of(), runInspection(true, i -> {
+                    i.ignoredAnnotations = new ArrayList<>(List.of("acme.KeptForTests"));
+                    i.reportClasses = false;
+                }));
     }
 
     public void testReportsNothingWhenScopeExcludesTestSources() {
@@ -359,83 +395,5 @@ public class TestOnlyMethodInspectionTest extends LightJavaCodeInsightFixtureTes
         // Without test sources in the graph a test-only method is indistinguishable from a fully
         // unused one, so the inspection must refuse to guess.
         assertEquals(Set.of(), runInspection(false));
-    }
-
-    // ---------------------------------------------------------------- harness
-
-    /**
-     * {@code getPresentation} is inherited from {@code GlobalInspectionContextImpl}, which is
-     * {@code @ApiStatus.Internal}. Deliberate: the sanctioned alternative,
-     * {@code InspectionTestUtil.compareToolResults}, diffs against a static expected-XML file, and
-     * these assertions are expressed as sets in code. Test-only, so a future platform change breaks
-     * this build rather than anyone's IDE.
-     */
-    private Set<String> runInspection(boolean includeTestSource) {
-        return runInspection(includeTestSource, inspection -> { });
-    }
-
-    /**
-     * @param configure applied to a fresh inspection before the run, so a single test can assert both
-     *                  directions of a setting and neither assertion can pass for the wrong reason.
-     */
-    @SuppressWarnings("UnstableApiUsage")
-    private Set<String> runInspection(boolean includeTestSource, Consumer<TestOnlyMethodInspection> configure) {
-        TestOnlyMethodInspection inspection = new TestOnlyMethodInspection();
-        configure.accept(inspection);
-        GlobalInspectionToolWrapper wrapper = new GlobalInspectionToolWrapper(inspection);
-        AnalysisScope scope = new AnalysisScope(getProject());
-        scope.setIncludeTestSource(includeTestSource);
-
-        GlobalInspectionContextForTests context =
-                InspectionsKt.createGlobalContextForTool(scope, getProject(), List.of(wrapper));
-        InspectionTestUtil.runTool(wrapper, scope, context);
-
-        InspectionToolResultExporter presentation = context.getPresentation(wrapper);
-        Set<String> reported = new TreeSet<>();
-        for (RefEntity entity : presentation.getProblemElements().keys()) {
-            if (!(entity instanceof RefMethod)) {
-                continue;
-            }
-            PsiMethod method = TestOnlyMethodDetector.asPsiMethod((RefMethod) entity);
-            if (method == null) {
-                continue;
-            }
-            PsiClass owner = method.getContainingClass();
-            reported.add((owner == null ? "?" : owner.getName()) + "." + method.getName());
-        }
-        return reported;
-    }
-
-    private void production(String fileName, String text) {
-        myFixture.addFileToProject(fileName, text);
-    }
-
-    private void inTestSources(String fileName, String text) {
-        VfsTestUtil.createFile(testSourceRoot(), fileName, text);
-    }
-
-    private static VirtualFile testSourceRoot() {
-        VirtualFile root = VirtualFileManager.getInstance()
-                .refreshAndFindFileByUrl("temp:///" + TwoRootProjectDescriptor.TEST_ROOT);
-        assertNotNull("test source root was not created by " + TwoRootProjectDescriptor.class.getSimpleName(), root);
-        return root;
-    }
-
-    /**
-     * The light project is cached and reused across test methods, so {@code configureModule} — and
-     * with it the source-root cleanup — runs only once. Files left in the test root would leak into
-     * the next test.
-     */
-    static void cleanTestSourceRoot() throws IOException {
-        VirtualFile root = VirtualFileManager.getInstance()
-                .refreshAndFindFileByUrl("temp:///" + TwoRootProjectDescriptor.TEST_ROOT);
-        if (root == null) {
-            return;
-        }
-        WriteAction.runAndWait(() -> {
-            for (VirtualFile child : root.getChildren()) {
-                child.delete(TestOnlyMethodInspectionTest.class);
-            }
-        });
     }
 }
