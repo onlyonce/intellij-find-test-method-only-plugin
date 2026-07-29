@@ -1,5 +1,8 @@
 # Test-Only Method Detector
 
+> 🤖 **100% vibecoded with Claude Opus 5.** Every line here — Java, Gradle, tests, this README — was
+> written by the model. See [Provenance](#provenance).
+
 An IntelliJ IDEA plugin that reports **production Java methods whose every caller lives in a test
 source root**.
 
@@ -87,6 +90,32 @@ compatible with 2026.1 and the 2026.2 EAP. Ten fixture tests cover the reporting
 
 Not yet exercised: a headless `inspect.sh` / Qodana run, and a large real-world Spring codebase — both
 entry-point coverage at scale and runtime are unmeasured there.
+
+## Provenance
+
+This plugin is **100% vibecoded with Claude Opus 5**, via Claude Code. No line of Java, Gradle
+configuration, test code or documentation in this repository was written by hand. The human role was
+to state the goal — *"find Java methods that are only called from test code"* — decide two design
+questions (direct-caller vs. transitive semantics; inspection-only vs. inspection plus a report UI),
+and review the result.
+
+That is worth stating plainly rather than hiding, because "vibecoded" usually implies unverified. Here
+is what was actually done to earn confidence:
+
+- **The design was derived from decompiled platform bytecode, not from recollection.** The claim that
+  IntelliJ's existing option is unusable rests on reading `RefJavaManagerImpl.isEntryPoint` out of
+  `intellij.java.analysis.impl.jar`, not on documentation or memory.
+- **Two real bugs were caught before they shipped.** `ProblemDescriptionsProcessor.ignoreElement`
+  turned out to be a `default` no-op on the headless path — the first design would have worked in the
+  IDE and silently produced false positives in CI. Separately, reading `getInReferences()` after graph
+  construction can observe an incomplete caller set, because reference building is lazy.
+- **The tests were mutation-checked, not just run green.** Each guard was verified by deliberately
+  breaking the code and confirming that exactly the intended test failed. This mattered: under a
+  broken annotator, six of the tests still passed — a suite of only "not reported" assertions would
+  have been theatre.
+- Ten fixture tests, `verifyPlugin` compatibility against two IDE builds.
+
+Known gaps are recorded honestly in [Status](#status) rather than glossed over.
 
 ## Licence
 
