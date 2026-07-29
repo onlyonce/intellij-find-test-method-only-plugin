@@ -65,7 +65,7 @@ public class TestOnlyMethodInspectionTest extends LightJavaCodeInsightFixtureTes
                     public int go() { return new Service().usedInProduction(); }
                 }
                 """);
-        testSource("ServiceTest.java", """
+        inTestSources("ServiceTest.java", """
                 public class ServiceTest {
                     public void checks() {
                         new Service().onlyTestsCallThis();
@@ -101,7 +101,7 @@ public class TestOnlyMethodInspectionTest extends LightJavaCodeInsightFixtureTes
                     }
                     """.formatted(i, i));
         }
-        testSource("ZzzServiceTest.java", """
+        inTestSources("ZzzServiceTest.java", """
                 public class ZzzServiceTest {
                     public void checks() { new AService().onlyTestsCallThis(); }
                 }
@@ -116,7 +116,7 @@ public class TestOnlyMethodInspectionTest extends LightJavaCodeInsightFixtureTes
                     public int neverCalledAtAll() { return 1; }
                 }
                 """);
-        testSource("OrphanTest.java", """
+        inTestSources("OrphanTest.java", """
                 public class OrphanTest {
                     public void checks() { }
                 }
@@ -137,12 +137,12 @@ public class TestOnlyMethodInspectionTest extends LightJavaCodeInsightFixtureTes
                     public int go() { return new Plain().value(); }
                 }
                 """);
-        testSource("Helper.java", """
+        inTestSources("Helper.java", """
                 public class Helper {
                     public int helperOnlyUsedByTests() { return 1; }
                 }
                 """);
-        testSource("HelperTest.java", """
+        inTestSources("HelperTest.java", """
                 public class HelperTest {
                     public void checks() { new Helper().helperOnlyUsedByTests(); }
                 }
@@ -158,7 +158,7 @@ public class TestOnlyMethodInspectionTest extends LightJavaCodeInsightFixtureTes
                     public static void main(String[] args) { }
                 }
                 """);
-        testSource("BootTest.java", """
+        inTestSources("BootTest.java", """
                 public class BootTest {
                     public void checks() {
                         new Boot();
@@ -179,7 +179,7 @@ public class TestOnlyMethodInspectionTest extends LightJavaCodeInsightFixtureTes
                     public Point make() { return new Point(1, 2); }
                 }
                 """);
-        testSource("PointTest.java", """
+        inTestSources("PointTest.java", """
                 public class PointTest {
                     public void checks() { new Point(1, 2).x(); }
                 }
@@ -204,7 +204,7 @@ public class TestOnlyMethodInspectionTest extends LightJavaCodeInsightFixtureTes
                     public String go(Greeter g) { return g.greet(); }
                 }
                 """);
-        testSource("GreeterTest.java", """
+        inTestSources("GreeterTest.java", """
                 public class GreeterTest {
                     public void checks() { new LoudGreeter().greet(); }
                 }
@@ -230,7 +230,7 @@ public class TestOnlyMethodInspectionTest extends LightJavaCodeInsightFixtureTes
                 /** See {@link Api#onlyTestsCallThis()} for the legacy behaviour. */
                 public class Docs { }
                 """);
-        testSource("ApiTest.java", """
+        inTestSources("ApiTest.java", """
                 public class ApiTest {
                     public void checks() { new Api().onlyTestsCallThis(); }
                 }
@@ -259,7 +259,7 @@ public class TestOnlyMethodInspectionTest extends LightJavaCodeInsightFixtureTes
                     public int frameworkCallsThis() { return 1; }
                 }
                 """);
-        testSource("BeansTest.java", """
+        inTestSources("BeansTest.java", """
                 public class BeansTest {
                     public void checks() { new Beans().frameworkCallsThis(); }
                 }
@@ -283,7 +283,7 @@ public class TestOnlyMethodInspectionTest extends LightJavaCodeInsightFixtureTes
                     public int onlyTestsCallThis() { return 1; }
                 }
                 """);
-        testSource("ServiceTest.java", """
+        inTestSources("ServiceTest.java", """
                 public class ServiceTest {
                     public void checks() { new Service().onlyTestsCallThis(); }
                 }
@@ -325,7 +325,7 @@ public class TestOnlyMethodInspectionTest extends LightJavaCodeInsightFixtureTes
         myFixture.addFileToProject(fileName, text);
     }
 
-    private void testSource(String fileName, String text) {
+    private void inTestSources(String fileName, String text) {
         VfsTestUtil.createFile(testSourceRoot(), fileName, text);
     }
 
