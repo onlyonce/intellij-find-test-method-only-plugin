@@ -44,20 +44,35 @@ public final class TestOnlyMethodInspection extends GlobalInspectionTool {
     static final String SHORT_NAME = "MethodUsedOnlyFromTests";
 
     /**
-     * Annotations that mark a method as knowingly test-facing. A method carrying one of these has
-     * already been acknowledged by whoever wrote it, so reporting it again is noise — and it would be
-     * loudest on the codebases that are most disciplined about marking such methods.
+     * Annotations that suppress reporting, on the method itself or on its containing class.
      * <p>
-     * Editable in the inspection settings rather than hard-coded: teams have their own conventions,
-     * and the well-known names below are only a starting point. Remove them to report annotated
-     * methods anyway; add your own to have them respected.
+     * Two kinds are seeded. The first marks a method as knowingly test-facing: it has already been
+     * acknowledged by whoever wrote it, so reporting it again is noise — and would be loudest on the
+     * codebases most disciplined about marking such methods.
+     * <p>
+     * The second marks generated code. A finding there is not actionable, because deleting the method
+     * only means the next build writes it back, and generators such as Avro emit large surfaces of
+     * accessors and builders that typically only tests touch. Note this is not the same as a
+     * <i>generated source root</i>: {@code AnalysisScope} already excludes those outright, so the
+     * cases that reach this inspection are exactly the ones the project model does <em>not</em> know
+     * are generated — which is why an annotation check is the mechanism that helps and a
+     * {@code GeneratedSourcesFilter} check would be a no-op.
+     * <p>
+     * Editable in the inspection settings rather than hard-coded: teams have their own conventions
+     * and their own generators, and the names below are only a starting point.
      * <p>
      * Public and non-final so the inspection profile can serialise it.
      */
     public List<String> ignoredAnnotations = new ArrayList<>(List.of(
+            // knowingly test-facing
             "org.jetbrains.annotations.TestOnly",
             "org.jetbrains.annotations.VisibleForTesting",
-            "com.google.common.annotations.VisibleForTesting"
+            "com.google.common.annotations.VisibleForTesting",
+            // generated code
+            "javax.annotation.Generated",
+            "javax.annotation.processing.Generated",
+            "jakarta.annotation.Generated",
+            "org.apache.avro.specific.AvroGenerated"
     ));
 
     private volatile CallerOrigins origins = new CallerOrigins();

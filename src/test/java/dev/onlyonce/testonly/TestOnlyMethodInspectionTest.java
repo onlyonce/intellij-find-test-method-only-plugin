@@ -22,6 +22,7 @@ import org.jetbrains.annotations.NotNull;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -310,9 +311,9 @@ public class TestOnlyMethodInspectionTest extends LightJavaCodeInsightFixtureTes
                 """);
 
         assertEquals("with an empty list the method must still be reported",
-                Set.of("Api.onlyTestsCallThis"), runInspection(true, List.of()));
+                Set.of("Api.onlyTestsCallThis"), runInspection(true, i -> i.ignoredAnnotations = new ArrayList<>()));
         assertEquals("configuring the annotation must suppress it",
-                Set.of(), runInspection(true, List.of("acme.KeptForTests")));
+                Set.of(), runInspection(true, i -> i.ignoredAnnotations = new ArrayList<>(List.of("acme.KeptForTests"))));
     }
 
     /**
@@ -338,9 +339,9 @@ public class TestOnlyMethodInspectionTest extends LightJavaCodeInsightFixtureTes
                 """);
 
         assertEquals("without the annotation configured the method must be reported",
-                Set.of("Fixtures.buildSample"), runInspection(true, List.of()));
+                Set.of("Fixtures.buildSample"), runInspection(true, i -> i.ignoredAnnotations = new ArrayList<>()));
         assertEquals("a class-level annotation must cover its methods",
-                Set.of(), runInspection(true, List.of("acme.KeptForTests")));
+                Set.of(), runInspection(true, i -> i.ignoredAnnotations = new ArrayList<>(List.of("acme.KeptForTests"))));
     }
 
     public void testReportsNothingWhenScopeExcludesTestSources() {
@@ -370,19 +371,17 @@ public class TestOnlyMethodInspectionTest extends LightJavaCodeInsightFixtureTes
      * this build rather than anyone's IDE.
      */
     private Set<String> runInspection(boolean includeTestSource) {
-        return runInspection(includeTestSource, null);
+        return runInspection(includeTestSource, inspection -> { });
     }
 
     /**
-     * @param ignoredAnnotations {@code null} keeps the shipped defaults; a list replaces them, which
-     *                           is what lets a single test assert both directions of the setting.
+     * @param configure applied to a fresh inspection before the run, so a single test can assert both
+     *                  directions of a setting and neither assertion can pass for the wrong reason.
      */
     @SuppressWarnings("UnstableApiUsage")
-    private Set<String> runInspection(boolean includeTestSource, List<String> ignoredAnnotations) {
+    private Set<String> runInspection(boolean includeTestSource, Consumer<TestOnlyMethodInspection> configure) {
         TestOnlyMethodInspection inspection = new TestOnlyMethodInspection();
-        if (ignoredAnnotations != null) {
-            inspection.ignoredAnnotations = new ArrayList<>(ignoredAnnotations);
-        }
+        configure.accept(inspection);
         GlobalInspectionToolWrapper wrapper = new GlobalInspectionToolWrapper(inspection);
         AnalysisScope scope = new AnalysisScope(getProject());
         scope.setIncludeTestSource(includeTestSource);

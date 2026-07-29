@@ -27,14 +27,25 @@ void testLegacyVat() {
     accessors and methods overriding library declarations are also skipped.
 </p>
 <p>
-    <b>Do not report methods annotated with</b> is an editable list of annotations that mark a method
-    as knowingly test-facing. A method carrying one of them has already been acknowledged, so
-    reporting it again is noise — and it would be loudest on the codebases most disciplined about
-    marking such methods. The list starts with <code>org.jetbrains.annotations.TestOnly</code>,
-    <code>org.jetbrains.annotations.VisibleForTesting</code> and Guava's
-    <code>com.google.common.annotations.VisibleForTesting</code>; remove them to report annotated
-    methods anyway, or add your own team's conventions. An annotation on the containing class counts
-    for every method in it, and an annotation on an overridden declaration counts for its overrides.
+    <b>Do not report methods annotated with</b> is an editable list. It is seeded with two groups:
+    annotations that mark a method as knowingly test-facing (<code>@TestOnly</code>, both
+    <code>@VisibleForTesting</code> variants), and annotations that mark generated code
+    (<code>@Generated</code> in its javax, jakarta and annotation-processing spellings, and Avro's
+    <code>@AvroGenerated</code>). A method carrying one of them has either been acknowledged already
+    or cannot be edited by hand, so reporting it is noise.
+</p>
+<p>
+    An annotation on the containing class counts for every method in it — which is what makes this
+    effective on generated record and builder classes — and an annotation on an overridden
+    declaration counts for its overrides. Remove entries to report annotated methods anyway, or add
+    your own team's conventions and generators.
+</p>
+<p>
+    Code under a folder marked as a <i>generated source root</i> never reaches this inspection: the
+    analysis scope excludes it outright. Generated code shows up here only when the project model
+    does not know it is generated — usually because the build plugin registered the folder as an
+    ordinary source root. Annotating is the fix; alternatively mark the folder as a generated source
+    root in <i>Project Structure | Modules</i>.
 </p>
 <p>
     This is a global inspection: run it via <i>Analyze | Inspect Code</i> with an analysis scope that

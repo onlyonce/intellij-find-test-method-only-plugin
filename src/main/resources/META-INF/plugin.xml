@@ -27,8 +27,9 @@
                 methods overriding library declarations.</li>
             <li>Confirms each finding against the index, so references from Spring XML, SpEL,
                 properties files and javadoc suppress the report.</li>
-            <li>Editable list of annotations that mark a method as knowingly test-facing, seeded with
-                <code>@TestOnly</code> and both <code>@VisibleForTesting</code> variants.</li>
+            <li>Editable list of annotations that suppress reporting, on the method or its class.
+                Seeded with <code>@TestOnly</code> and both <code>@VisibleForTesting</code> variants,
+                plus generated-code markers (<code>@Generated</code>, <code>@AvroGenerated</code>).</li>
         </ul>
     ]]></change-notes>
 

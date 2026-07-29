@@ -45,12 +45,26 @@ constructors and Jackson accessors are left alone.
 
 ### Annotated methods — a configurable list
 
-A method you have already marked as test-facing is not reported. Which annotations count is an
-editable list in the inspection settings, seeded with:
+A method annotated as test-facing — or belonging to an annotated class — is not reported. Which
+annotations count is an editable list in the inspection settings, seeded with two groups:
+
+*Knowingly test-facing*
 
 - `org.jetbrains.annotations.TestOnly`
 - `org.jetbrains.annotations.VisibleForTesting`
 - `com.google.common.annotations.VisibleForTesting`
+
+*Generated code* — not actionable, since deleting the method only means the next build writes it back
+
+- `javax.annotation.Generated`, `javax.annotation.processing.Generated`, `jakarta.annotation.Generated`
+- `org.apache.avro.specific.AvroGenerated`
+
+> Generated code marked as a **generated source root** in the project model never reaches this
+> inspection at all — `AnalysisScope` excludes those outright. The cases that *do* reach it are
+> precisely the ones the project model does not know are generated, typically because the build
+> plugin registered the folder as an ordinary source root. That is why the annotation check is what
+> helps here and a `GeneratedSourcesFilter` check would be a no-op. If your generator emits no marker
+> annotation, mark the folder as a generated source root in *Project Structure → Modules* instead.
 
 Remove them to report annotated methods anyway, or add your own conventions — the field offers
 annotation-name completion. An annotation on the containing class covers every method in it, and one
